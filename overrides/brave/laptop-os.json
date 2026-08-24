@@ -1,0 +1,18 @@
+{
+  "BraveRewardsDisabled": true,
+  "BraveWalletDisabled": true,
+  "BraveVPNDisabled": true,
+  "BraveTorDisabled": true,
+  "BraveAIChatEnabled": false,
+  "BraveSyncUrl": "",
+  "PasswordManagerEnabled": false,
+  "ExtensionSettings": {
+    "aeblfdkhhhdcdjpifhhbdiojplfjncoa": {
+      "installation_mode": "force_installed",
+      "update_url": "https://clients2.google.com/service/update2/crx"
+    },
+    "*": {
+      "installation_mode": "allowed"
+    }
+  }
+}

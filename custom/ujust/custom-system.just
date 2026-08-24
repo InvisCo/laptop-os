@@ -29,6 +29,15 @@ benchmark:
     stress-ng --matrix 0 -t 1m --times
     popd > /dev/null
 
+# Activate the baked LibreWolf overrides (loosened privacy defaults)
+[group('System')]
+laptop-os-librewolf-overrides:
+    #!/usr/bin/env bash
+    mkdir -p "$HOME/.librewolf"
+    cp /usr/share/laptop-os/librewolf/librewolf.overrides.cfg "$HOME/.librewolf/librewolf.overrides.cfg"
+    echo "Overrides installed to ~/.librewolf/librewolf.overrides.cfg"
+    echo "Restart LibreWolf to apply."
+
 # Configure docker and libvirt groups for development
 [group('System')]
 configure-dev-groups:

@@ -1,39 +1,37 @@
-# finpilot
+# laptop-os
 
-A template for building custom bootc operating system images based on the lessons from [Universal Blue](https://universal-blue.org/) and [Bluefin](https://projectbluefin.io). It is designed to be used manually, but is optimized to be bootstraped by GitHub Copilot. After set up you'll have your own custom Linux.
-
-This template uses the **multi-stage build architecture** from @projectbluefin/distroless, combining resources from multiple OCI containers for modularity and maintainability. See the [Architecture](#architecture) section below for details.
-
-**Unlike previous templates, you are not modifying Bluefin and making changes.**: You are assembling your own Bluefin in the same exact way that Bluefin, Aurora, and Bluefin LTS are built. This is way more flexible and better for everyone since the image-agnostic and desktop things we love about Bluefin lives in @projectbluefin/common.
-
-Instead, you create your own OS repository based on this template, allowing full customization while leveraging Bluefin's robust build system and shared components.
-
-> Be the one who moves, not the one who is moved.
+Personal custom bootc image for a Dell XPS 9315 laptop, built with the finpilot multi-stage architecture on `@projectbluefin/common`. Goal: keep Bluefin-class atomic updates and rollback while baking every rpm-ostree layer into the image itself.
 
 ## What Makes this Raptor Different?
 
-Here are the changes from [Base Image Name]. This image is based on [Bluefin/Bazzite/Aurora/etc] and includes these customizations:
+Here are the changes from Fedora Silverblue 44 + @projectbluefin/common. This image includes these customizations:
 
 ### Added Packages (Build-time)
 
-- **System packages**: `tmux` and `gum` — tmux is the template's package-manager cache smoke test, and gum provides the interactive prompts used by the default ujust recipes.
+- **System packages**: `tmux`, `gum` (template defaults), plus `cups-pdf`, `libvirt`, `qemu-kvm`, `virt-manager` (VM workflows).
+- **1Password**: desktop app + CLI (`1password`, `1password-cli`) from the official AgileBits RPM repository, so the app, CLI, and browser extensions share native messaging without any sandbox in between.
+- **Browsers (native RPMs only — no Flatpak browsers)**:
+  - **LibreWolf** (primary) from the official signed `repo.librewolf.net` repository, with the 1Password native-messaging symlink baked in.
+  - **Brave** from the official Brave RPM repository, de-bloated via managed policies (Rewards/Wallet/VPN/Tor/AI-chat off, built-in password manager off, 1Password extension force-installed).
+- **Zed editor** via the `cjatherton/zed` COPR (isolated enable, upstream-tracked releases).
+- **Epson printer drivers**: vendored proprietary RPMs (`epson-inkjet-printer-201207w`, `epson-inkjet-printer-201215w`) under `rpms/` with SHA256 checksums.
 
 ### Added Applications (Runtime)
 
-- **CLI Tools (Homebrew)**: neovim, helix - [brief explanation]
-- **GUI Apps (Flatpak)**: Spotify, Thunderbird - [brief explanation]
+- **GUI Apps (Flatpak)**: Zen browser (`app.zen_browser.zen`) as a casual secondary browser.
 
 ### Removed/Disabled
 
-- List anything removed from base image
+- No Firefox RPM or Flatpak browser baked in; LibreWolf replaces Firefox, profiles migrate at deploy time.
+- Brave crypto wallet/rewards/VPN/Tor/news disabled via `/etc/brave/policies/managed/laptop-os.json`.
 
 ### Configuration Changes
 
-- Any systemd services enabled/disabled
-- Desktop environment changes
-- Other notable modifications
+- LibreWolf loosened-defaults overrides shipped to `/usr/share/laptop-os/librewolf/librewolf.overrides.cfg`; activate per user with `ujust laptop-os-librewolf-overrides`.
+- 1Password native messaging bridged into LibreWolf: `/usr/lib64/mozilla/native-messaging-hosts -> /usr/lib/librewolf/native-messaging-hosts`.
+- `libvirtd.socket` + `libvirtd.service` enabled at boot.
 
-_Last updated: [date]_
+_Last updated: 2026-08-24_
 
 > Replace the placeholders above with your actual customizations whenever you add or remove packages, apps, or configuration. This section is what tells users how your image differs from the base.
 

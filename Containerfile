@@ -1,9 +1,9 @@
 ###############################################################################
 # PROJECT NAME CONFIGURATION
 ###############################################################################
-# Name: finpilot
+# Name: laptop-os
 #
-# IMPORTANT: Change "finpilot" above to your desired project name.
+# IMPORTANT: Change "laptop-os" above to your desired project name.
 # This name should be used consistently throughout the repository in:
 #   - Justfile: export IMAGE_NAME := env("IMAGE_NAME", "your-name-here")
 #   - README.md: # your-name-here (title)
@@ -44,6 +44,8 @@ FROM scratch AS ctx
 
 COPY build /build
 COPY custom /custom
+COPY rpms /rpms
+COPY overrides /overrides
 
 # Copy from OCI containers to distinct subdirectories to avoid conflicts
 COPY --from=common /system_files /oci/common
@@ -55,7 +57,7 @@ FROM quay.io/fedora-ostree-desktops/silverblue:44@sha256:ca92f13f07342c30fbc043a
 
 # Image identity - these define how bootc, fastfetch, and the ublue ecosystem
 # recognize your image. Change these to match your project name.
-ARG IMAGE_NAME="finpilot"
+ARG IMAGE_NAME="laptop-os"
 ARG IMAGE_VENDOR="projectbluefin"
 ARG UBLUE_IMAGE_TAG="stable"
 ARG BASE_IMAGE_NAME="silverblue"
@@ -79,6 +81,12 @@ RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
 # Set dnf options before build scripts (persists across subsequent RUN layers)
 RUN dnf5 config-manager setopt keepcache=1 install_weak_deps=0
 
+# laptop-os ships RPMs that unpack into a real /opt (1Password, Brave).
+# The base image symlinks /opt -> /var/opt which breaks rpm cpio unpacking,
+# so swap in a real directory before any build script runs. Unlike the
+# template default, this stays a real directory for the life of the image.
+RUN rm -f /opt && mkdir -p /opt
+
 RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
     --mount=type=cache,dst=/var/cache/libdnf5 \
     --mount=type=cache,dst=/var/cache/rpm-ostree \
@@ -86,6 +94,30 @@ RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
     --mount=type=tmpfs,dst=/boot \
     --mount=type=tmpfs,dst=/tmp \
     /ctx/build/10-build.sh
+
+RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
+    --mount=type=cache,dst=/var/cache/libdnf5 \
+    --mount=type=cache,dst=/var/cache/rpm-ostree \
+    --mount=type=secret,id=GITHUB_TOKEN \
+    --mount=type=tmpfs,dst=/boot \
+    --mount=type=tmpfs,dst=/tmp \
+    /ctx/build/20-onepassword.sh
+
+RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
+    --mount=type=cache,dst=/var/cache/libdnf5 \
+    --mount=type=cache,dst=/var/cache/rpm-ostree \
+    --mount=type=secret,id=GITHUB_TOKEN \
+    --mount=type=tmpfs,dst=/boot \
+    --mount=type=tmpfs,dst=/tmp \
+    /ctx/build/30-browsers.sh
+
+RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
+    --mount=type=cache,dst=/var/cache/libdnf5 \
+    --mount=type=cache,dst=/var/cache/rpm-ostree \
+    --mount=type=secret,id=GITHUB_TOKEN \
+    --mount=type=tmpfs,dst=/boot \
+    --mount=type=tmpfs,dst=/tmp \
+    /ctx/build/40-epson-printers.sh
 
 ### CLEANUP
 ## Use Bluefin's clean-stage.sh to remove build artifacts before linting.
@@ -98,12 +130,9 @@ RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
     /ctx/build/clean-stage.sh
 
 ### /opt
-## Makes /opt writeable by default. Needs to be here to make the main image
-## build strict (no /opt there). This is for downstream images/stuff like k0s.
-## If you need /opt as an immutable real directory for build-time packages
-## (e.g. google-chrome, docker-desktop), replace the next line with:
-##   RUN rm /opt && mkdir /opt
-RUN rm -rf /opt && ln -s /var/opt /opt
+## laptop-os keeps /opt as a real directory (see early RUN above) because
+## 1Password and Brave install into it. Do NOT replace it with the
+## template's `ln -s /var/opt /opt` symlink.
 
 ### INIT
 ## Required for bootc images

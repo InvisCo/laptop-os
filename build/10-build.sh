@@ -45,8 +45,14 @@ echo "::group:: Install Packages"
 # gum is required by the default ujust recipes for interactive prompts.
 dnf5 install -y tmux gum
 
-# Example using COPR with isolated pattern:
-# copr_install_isolated "ublue-os/staging" package-name
+### laptop-os system packages (Fedora repos)
+# cups-pdf      - virtual PDF printer
+# virt stack    - libvirt, qemu-kvm, virt-manager for VM workflows
+dnf5 install -y cups-pdf libvirt qemu-kvm virt-manager
+
+### Zed editor via COPR (not packaged in Fedora repos)
+# cjatherton/zed tracks upstream releases and builds for fedora-44.
+copr_install_isolated "cjatherton/zed" zed
 
 echo "::endgroup::"
 
@@ -57,6 +63,7 @@ systemctl enable podman.socket
 systemctl enable brew-setup.service
 systemctl enable brew-update.timer
 systemctl enable brew-upgrade.timer
+systemctl enable libvirtd.socket libvirtd.service
 # Example: systemctl mask unwanted-service
 
 echo "::endgroup::"
