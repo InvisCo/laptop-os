@@ -69,14 +69,60 @@ Two-branch model:
 
 Note: pushes made by `GITHUB_TOKEN` don't trigger workflows — the first-ever promotion seeded `stable` directly and needed a manual `workflow_dispatch` build on the stable branch.
 
-## Deploying
+Rollback: pick the previous deployment in GRUB (system state only, `/home` untouched).
+
+## Migration Guide (from stock Bluefin)
+
+Run once when first switching this laptop from layered `ublue-os/bluefin:stable` to this image.
+
+### 1. Before switching — back up profiles
 
 ```bash
-sudo bootc switch --transport registry ghcr.io/invisco/laptop-os:stable-testing && reboot  # trial
-sudo bootc switch --transport registry ghcr.io/invisco/laptop-os:stable && reboot          # production
+mkdir -p ~/Repositories/laptop-os-migration-backup
+cp -a ~/.var/app/org.mozilla.firefox/.mozilla/firefox ~/Repositories/laptop-os-migration-backup/
+cp -a ~/.var/app/org.mozilla.thunderbird_esr/.thunderbird ~/Repositories/laptop-os-migration-backup/ 2>/dev/null || true
 ```
 
-Rollback: pick the previous deployment in GRUB (system state only, `/home` untouched).
+### 2. Switch
+
+```bash
+sudo bootc switch --transport registry ghcr.io/invisco/laptop-os:stable-testing && reboot
+```
+
+All previous rpm-ostree layers (1Password, virt stack, cups-pdf, Epson LocalPackages) are dropped automatically — everything is baked into the image. The old Bluefin deployment stays bootable from GRUB.
+
+### 3. After first boot — in order
+
+1. Activate LibreWolf overrides:
+   ```bash
+   ujust laptop-os-librewolf-overrides
+   ```
+2. Migrate the Firefox profile into LibreWolf:
+   ```bash
+   mkdir -p ~/.librewolf
+   cp -a ~/.var/app/org.mozilla.firefox/.mozilla/firefox/* ~/.librewolf/
+   # if ~/.librewolf/profiles.ini doesn't exist or lacks your profile,
+   # create it pointing Path= at the copied profile directory
+   ```
+3. Launch LibreWolf: verify bookmarks, logins, extensions, and that the 1Password extension unlocks against the desktop app (native messaging symlink is baked).
+4. Verify the rest of the triangle: `op whoami`, and Brave's force-installed 1Password extension.
+5. Print a test page on each Epson queue; boot a VM in virt-manager; confirm Zen Flatpak arrived (`flatpak list | grep zen`).
+6. Only after everything checks out, remove superseded Flatpaks:
+   ```bash
+   flatpak uninstall --user org.mozilla.firefox dev.zed.Zed org.mozilla.thunderbird_esr
+   ```
+
+Thunderbird account migration to Betterbird is not needed if you keep the Betterbird Flatpak (its own profile is untouched); copy Thunderbird's profile only if you want its accounts inside Betterbird.
+
+### 4. Go to production
+
+After stable-testing survives a few days:
+
+```bash
+sudo bootc switch --transport registry ghcr.io/invisco/laptop-os:stable && reboot
+```
+
+Future updates arrive automatically via staged updates against this image.
 
 ## Verify Signature
 
@@ -95,7 +141,3 @@ cosign verify \
 - **Build scripts must be executable** — `chmod +x build/*.sh` or CI fails with `Permission denied`.
 - **Actions must be allowed to create PRs**: repo setting "Allow GitHub Actions to create and approve pull requests" (API: `actions/permissions/workflow`).
 - **Flatpaks install on first boot** via `flatpak-preinstall.service`, not during `bootc switch`; Homebrew likewise via `brew-setup.service`. Wait for both before assuming failure.
-
-## Pending Setup
-
-- `RENOVATE_TOKEN` secret (classic PAT, `repo`+`workflow` scopes) — without it, pinned digests/base image updates must be bumped manually.
