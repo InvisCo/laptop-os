@@ -43,7 +43,9 @@ if [[ -n "${RATE_REMAINING}" && "${RATE_REMAINING}" -lt "${MIN_REMAINING}" ]]; t
 fi
 
 # Check scopes (PATs only — fine-grained tokens don't expose scopes this way)
-SCOPES=$(grep -i "^x-oauth-scopes:" "${HEADERS_FILE}" | sed 's/^x-oauth-scopes:\s*//i' | tr -d '\r')
+# `|| true`: grep exits 1 when the header is absent (fine-grained tokens);
+# without this, set -euo pipefail aborts before the skip branch below.
+SCOPES=$(grep -i "^x-oauth-scopes:" "${HEADERS_FILE}" | sed 's/^x-oauth-scopes:\s*//i' | tr -d '\r' || true)
 EXPIRES_AT=""
 
 if [[ -n "${SCOPES}" ]]; then
