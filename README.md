@@ -95,7 +95,3 @@ cosign verify \
 - **Build scripts must be executable** — `chmod +x build/*.sh` or CI fails with `Permission denied`.
 - **Actions must be allowed to create PRs**: repo setting "Allow GitHub Actions to create and approve pull requests" (API: `actions/permissions/workflow`).
 - **Flatpaks install on first boot** via `flatpak-preinstall.service`, not during `bootc switch`; Homebrew likewise via `brew-setup.service`. Wait for both before assuming failure.
-
-## Pending Setup
-
-- `RENOVATE_TOKEN` secret (classic PAT, `repo`+`workflow` scopes) — without it, pinned digests/base image updates must be bumped manually.
