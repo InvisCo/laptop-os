@@ -51,6 +51,24 @@ COPY overrides /overrides
 COPY --from=common /system_files /oci/common
 COPY --from=brew /system_files /oci/brew
 
+# Builder for Epson escpr (L4160/L3250) — keeps gcc/cups-devel out of final image
+# Uses same silverblue base for ABI parity; output in /out for COPY --from
+FROM quay.io/fedora-ostree-desktops/silverblue:44@sha256:3318ebff7eada58e23c3aa8dc84349638b109a866fcd6cb5e9e150687179e701 AS escpr-builder
+COPY --from=ctx /rpms/epson-inkjet-printer-escpr-*.src.rpm /tmp/
+RUN dnf5 install -y --setopt=install_weak_deps=0 gcc make autoconf automake libtool cups-devel \
+ && mkdir -p /tmp/build /out \
+ && rpm2cpio /tmp/epson-inkjet-printer-escpr-*.src.rpm | (cd /tmp/build && cpio -id --quiet) \
+ && tar -xzf /tmp/build/epson-inkjet-printer-escpr-*.tar.gz -C /tmp/build \
+ && srcdir=$(echo /tmp/build/epson-inkjet-printer-escpr-*/) \
+ && (cd "$srcdir" && CFLAGS="-Wno-error=implicit-function-declaration -Wno-error=implicit-int -Wno-implicit-function-declaration" \
+    ./configure --prefix=/usr --libdir=/usr/lib64 \
+        --with-cupsfilterdir=/opt/epson-inkjet-printer-escpr/cups/lib/filter \
+        --with-cupsppddir=/opt/epson-inkjet-printer-escpr/ppds/Epson) \
+ && make -C "$srcdir" CFLAGS="-Wno-error=implicit-function-declaration -Wno-error=implicit-int -Wno-implicit-function-declaration" -j"$(nproc)" \
+ && make -C "$srcdir" install-strip DESTDIR=/out \
+ && rm -f /out/usr/lib64/*.a /out/usr/lib64/*.la \
+ && rm -rf /tmp/build /tmp/*.src.rpm
+
 # Base Image - GNOME included (Fedora official OSTree desktop)
 # Renovate will keep the digest pin up to date.
 FROM quay.io/fedora-ostree-desktops/silverblue:44@sha256:808d4e71424ac76542c406f970ffab84ec7252cb76224060e67a76a6cebdc175
@@ -86,6 +104,11 @@ RUN dnf5 config-manager setopt keepcache=1 install_weak_deps=0
 # so swap in a real directory before any build script runs. Unlike the
 # template default, this stays a real directory for the life of the image.
 RUN rm -f /opt && mkdir -p /opt
+
+# Epson escpr (L4160/L3250) built in escpr-builder; copy without toolchain
+COPY --from=escpr-builder /out/opt/epson-inkjet-printer-escpr /opt/epson-inkjet-printer-escpr
+COPY --from=escpr-builder /out/usr/lib64/libescpr.so* /usr/lib64/
+RUN ldconfig
 
 RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
     --mount=type=cache,dst=/var/cache/libdnf5 \
