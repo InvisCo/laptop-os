@@ -34,6 +34,11 @@
 # See: https://docs.projectbluefin.io/contributing/ for architecture diagram
 ###############################################################################
 
+# Base Image - GNOME included (Fedora official OSTree desktop)
+# Renovate will keep the digest pin up to date.
+ARG BASE_IMAGE="quay.io/fedora-ostree-desktops/silverblue:44@sha256:1516b8a2b4e4cbe959c32f8b58abaa9328cd496e2bc3c6c13123dd67794c0f9d"
+ARG ESCPR_CFLAGS="-Wno-error=implicit-function-declaration -Wno-error=implicit-int -Wno-implicit-function-declaration"
+
 # OCI context images - imported below and pinned directly in their FROM lines.
 # The base image is pinned in the FROM line below and updated by Renovate.
 FROM ghcr.io/projectbluefin/common:latest@sha256:44c7c59c910e00a26b0209f8be0915d8c67af095b108ed5a9d4842c32ed63dae AS common
@@ -51,10 +56,22 @@ COPY overrides /overrides
 COPY --from=common /system_files /oci/common
 COPY --from=brew /system_files /oci/brew
 
-# Base Image - GNOME included (Fedora official OSTree desktop)
-# Renovate will keep the digest pin up to date.
-FROM quay.io/fedora-ostree-desktops/silverblue:44@sha256:808d4e71424ac76542c406f970ffab84ec7252cb76224060e67a76a6cebdc175
+# Builder for Epson escpr (L4160/L3250) — keeps gcc/cups-devel out of final image
+FROM ${BASE_IMAGE} AS escpr-builder
+ARG ESCPR_CFLAGS
+COPY --from=ctx /rpms/epson-inkjet-printer-escpr-*.src.rpm /tmp/
+RUN dnf5 install -y --setopt=install_weak_deps=0 gcc make autoconf automake libtool cups-devel \
+ && mkdir -p /tmp/build /out \
+ && rpm2cpio /tmp/epson-inkjet-printer-escpr-*.src.rpm | (cd /tmp/build && cpio -id --quiet) \
+ && tar -xzf /tmp/build/epson-inkjet-printer-escpr-*.tar.gz -C /tmp/build \
+ && srcdir=$(echo /tmp/build/epson-inkjet-printer-escpr-*/) \
+ && (cd "$srcdir" && CFLAGS="${ESCPR_CFLAGS}" ./configure --prefix=/usr --libdir=/usr/lib64 --with-cupsfilterdir=/opt/epson-inkjet-printer-escpr/cups/lib/filter --with-cupsppddir=/opt/epson-inkjet-printer-escpr/ppds/Epson) \
+ && make -C "$srcdir" CFLAGS="${ESCPR_CFLAGS}" -j"$(nproc)" \
+ && make -C "$srcdir" install-strip DESTDIR=/out \
+ && rm -f /out/usr/lib64/*.a /out/usr/lib64/*.la \
+ && rm -rf /tmp/build /tmp/*.src.rpm
 
+FROM ${BASE_IMAGE}
 # Image identity - these define how bootc, fastfetch, and the ublue ecosystem
 # recognize your image. Change these to match your project name.
 ARG IMAGE_NAME="laptop-os"
@@ -86,6 +103,11 @@ RUN dnf5 config-manager setopt keepcache=1 install_weak_deps=0
 # so swap in a real directory before any build script runs. Unlike the
 # template default, this stays a real directory for the life of the image.
 RUN rm -f /opt && mkdir -p /opt
+
+# Epson escpr (L4160/L3250) built in escpr-builder; copy without toolchain
+COPY --from=escpr-builder /out/opt/epson-inkjet-printer-escpr /opt/epson-inkjet-printer-escpr
+COPY --from=escpr-builder /out/usr/lib64/libescpr.so* /usr/lib64/
+RUN ldconfig
 
 RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
     --mount=type=cache,dst=/var/cache/libdnf5 \
