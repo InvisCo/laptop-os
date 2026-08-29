@@ -3,3 +3,39 @@
 
 [Flatpak Preinstall app.zen_browser.zen]
 Branch=stable
+
+[Flatpak Preinstall org.gnome.gitlab.somas.Apostrophe]
+Branch=stable
+
+[Flatpak Preinstall https://flathub.org/apps/eu.betterbird.Betterbird]
+Branch=stable
+
+[Flatpak Preinstall https://flathub.org/apps/org.gimp.GIMP]
+Branch=stable
+
+[Flatpak Preinstall https://flathub.org/apps/org.inkscape.Inkscape]
+Branch=stable
+
+[Flatpak Preinstall https://flathub.org/apps/org.libreoffice.LibreOffice]
+Branch=stable
+
+[Flatpak Preinstall https://flathub.org/apps/org.kde.okular]
+Branch=stable
+
+[Flatpak Preinstall https://flathub.org/apps/org.onlyoffice.desktopeditors]
+Branch=stable
+
+[Flatpak Preinstall https://flathub.org/apps/com.protonvpn.www]
+Branch=stable
+
+[Flatpak Preinstall https://flathub.org/apps/org.rncbc.qpwgraph]
+Branch=stable
+
+[Flatpak Preinstall https://flathub.org/apps/com.rawtherapee.RawTherapee]
+Branch=stable
+
+[Flatpak Preinstall https://flathub.org/apps/org.remmina.Remmina]
+Branch=stable
+
+[Flatpak Preinstall https://flathub.org/apps/com.rustdesk.RustDesk]
+Branch=stable

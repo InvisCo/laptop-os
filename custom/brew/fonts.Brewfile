@@ -2,8 +2,8 @@
 # Uncomment fonts you want to install
 
 # Popular coding fonts
-# cask "font-fira-code-nerd-font"
-# cask "font-jetbrains-mono-nerd-font"
+cask "font-fira-code-nerd-font"
+cask "font-jetbrains-mono-nerd-font"
 # cask "font-meslo-lg-nerd-font"
 # cask "font-hack-nerd-font"
 
