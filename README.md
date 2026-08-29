@@ -16,7 +16,7 @@ Published as `ghcr.io/invisco/laptop-os:{stable,stable-testing,testing}`, keyles
   - **LibreWolf** (primary) from the official signed `repo.librewolf.net` repository, with the 1Password native-messaging symlink baked in.
   - **Brave** from the official Brave RPM repository, de-bloated via managed policies (Rewards/Wallet/VPN/Tor/AI-chat off, built-in password manager off, 1Password extension force-installed).
 - **Zed editor** via the `cjatherton/zed` COPR (isolated enable, upstream-tracked releases).
-- **Epson printer drivers**: vendored proprietary RPMs (`epson-inkjet-printer-201207w`, `epson-inkjet-printer-201215w`) under `rpms/` with SHA256 checksums.
+- **Epson printer drivers**: vendored RPMs (`epson-inkjet-printer-201207w`/`201215w` for L355/M105 + `epson-inkjet-printer-escpr` 1.8.8 src.rpm for L4160/L3250 via https://github.com/vmartins/epson-inkjet-printer-escpr) under `rpms/` with SHA256 checksums.
 
 ### Added Applications (Runtime)
 

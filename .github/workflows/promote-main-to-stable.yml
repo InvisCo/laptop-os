@@ -1,18 +1,6 @@
 ---
 name: Promote main to stable
 
-# Local replacement for projectbluefin/actions reusable-promote-squash.yml.
-# The factory reusable requests review from an `<owner>/maintainers` team,
-# which does not exist on personal accounts. This thin local version keeps
-# the same contract: every push to `main` opens (or refreshes) a squash
-# promotion PR from `main` to `stable`; merging it publishes `:stable`.
-#
-# Differences from upstream:
-# - No reviewer request (personal account)
-# - No cosign release-gate callout (advisory upstream; signing is still
-#   performed keylessly in build-image.yml)
-# - Seeds `stable` from `main` on first run (template ships without `stable`)
-
 on:
   push:
     branches:
@@ -20,8 +8,12 @@ on:
   workflow_dispatch:
 
 permissions:
+  actions: read
   contents: write
+  issues: write
+  packages: read
   pull-requests: write
+  statuses: write
 
 concurrency:
   group: promote-main-to-stable
@@ -30,44 +22,10 @@ concurrency:
 jobs:
   promote:
     name: Promote main to stable
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout full history
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-        with:
-          fetch-depth: 0
-
-      - name: Open or refresh promotion PR
-        env:
-          GH_TOKEN: ${{ github.token }}
-          REPO: ${{ github.repository }}
-        run: |
-          set -euo pipefail
-
-          # First run: seed `stable` from `main` (identical content, no gate needed)
-          if ! git ls-remote --exit-code --heads origin stable >/dev/null 2>&1; then
-            echo "No stable branch yet - seeding stable from main."
-            git push origin "origin/main:refs/heads/stable"
-            exit 0
-          fi
-
-          git fetch origin main stable
-          if [ "$(git rev-parse origin/main)" = "$(git rev-parse origin/stable)" ]; then
-            echo "main and stable are in sync - nothing to promote."
-            exit 0
-          fi
-
-          TITLE="chore: promote main to stable"
-          BODY="Automated promotion of \`main\` to \`stable\`. Merging publishes the \`:stable\` image tag."
-
-          NUMBER="$(gh pr list --repo "$REPO" --base stable --head main --state open --json number --jq '.[0].number // ""')"
-          if [ -z "$NUMBER" ]; then
-            NUMBER="$(gh pr create --repo "$REPO" --base stable --head main --title "$TITLE" --body "$BODY" | grep -oE '[0-9]+$')"
-            echo "Created promotion PR #$NUMBER"
-          else
-            echo "Promotion PR #$NUMBER already open (auto-refreshes with main)."
-          fi
-
-          # Best effort: enable auto-merge if repo settings allow it
-          gh pr merge --auto --squash --repo "$REPO" "$NUMBER" || \
-            echo "::notice::Auto-merge not enabled yet - merge PR #$NUMBER manually after CI passes."
+    uses: projectbluefin/actions/.github/workflows/reusable-promote-squash.yml@eb4c546389f19ad9e42f1af052623de73c620ebb # v1
+    with:
+      variants: '[{"image":"laptop-os"}]'
+      cosign_identity_regexp: '^https://github\.com/InvisCo/laptop-os/\.github/workflows/'
+      source_branch: main
+      target_branch: stable
+    secrets: inherit
