@@ -5,6 +5,7 @@
   "prConcurrentLimit": 20,
   "recreateWhen": "always",
   "rebaseWhen": "auto",
+  "platformAutomerge": false,
   "customManagers": [
     {
       "customType": "regex",
