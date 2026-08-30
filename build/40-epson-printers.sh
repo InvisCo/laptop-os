@@ -16,8 +16,11 @@ set -euo pipefail
 
 echo "Installing vendored Epson printer drivers..."
 
-# Integrity is guaranteed by rpms/SHA256SUMS (verified in CI), so the
-# legacy vendor signatures (SHA1-era digests) are skipped here.
+# Vendor RPMs only carry SHA1-era signatures, so rpm must skip both digest and
+# signature checks; integrity is enforced here instead against rpms/SHA256SUMS.
+# SHA256SUMS paths are relative to the repo root (/ctx).
+(cd /ctx && sha256sum -c rpms/SHA256SUMS)
+
 for rpm in /ctx/rpms/epson-inkjet-printer-*.x86_64.rpm; do
     [ -e "$rpm" ] || continue
     echo "Installing $(basename "$rpm")"
