@@ -154,6 +154,30 @@ Digest-only updates are hash changes with no API surface change. Safe.
 
 `projectbluefin/actions` is controlled by the same factory — minor/patch bumps are safe.
 
+### ⚠️ Require `platformAutomerge: false` for unattended digest automerge
+
+GitHub-native auto-merge (`enablePullRequestAutoMerge`, the default when
+`automergeType: pr`) **silently fails** on PRs that are already fully
+mergeable. Renovate tries to arm auto-merge immediately after opening, but
+if the PR's `mergeable_state` is `clean`, GitHub rejects the mutation:
+
+```
+GitHub-native automerge: fail
+UNPROCESSABLE enablePullRequestAutoMerge
+"Pull request is in clean status"
+```
+
+Symptom: Digest PRs pass checks instantly, so they are *always* clean at
+arm-time → auto-merge can never register → Rust PRs sit open forever (each
+run logs `GitHub-native automerge: fail`, no error surfaced to Actions
+summary). Earlier `"Protected branch rules not configured for this branch"`
+errors are the same race on a still-computing `mergeable_state`.
+
+Fix: set `"platformAutomerge": false` so Renovate merges PRs itself via the
+API (`PUT /pulls/{n}/merge`). The self-hosted runner's `RENOVATE_TOKEN`
+(PAT, `repo` scope) can merge a `clean` PR directly, so no GitHub-native
+mutations are involved. Reference repair in `laptop-os` #27–#31.
+
 ### ❌ Do NOT automerge broadly for `minor`/`patch`
 
 Minor and patch updates across all packages can change workflow behaviour or introduce
@@ -213,4 +237,5 @@ Add suppressions sparingly. If you suppress a new rule, document the reason inli
 - [ ] Automerge broad rule is `digest/pin/pinDigest` only (not `minor`/`patch`)?
 - [ ] `actionlint .github/workflows/*.yml` passes clean?
 - [ ] `renovate-config-validator .github/renovate.json` passes clean?
+- [ ] `renovate.json` has `platformAutomerge: false` if digest PRs must merge unattended?
 - [ ] `RENOVATE_TOKEN` secret documented in SETUP_CHECKLIST.md?
