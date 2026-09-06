@@ -36,7 +36,7 @@
 
 # Base Image - GNOME included (Fedora official OSTree desktop)
 # Renovate will keep the digest pin up to date.
-ARG BASE_IMAGE="quay.io/fedora-ostree-desktops/silverblue:44@sha256:b4bcc283d192ebe809c733b215cc097a4c65616c00dd1aaf874d3714495d0396"
+ARG BASE_IMAGE="quay.io/fedora-ostree-desktops/silverblue:44@sha256:d41e18dc51dff4c265fd2462875ca81cbd06be4848aa0f0d85707c1e63dd6288"
 ARG ESCPR_CFLAGS="-Wno-error=implicit-function-declaration -Wno-error=implicit-int -Wno-implicit-function-declaration"
 
 # OCI context images - imported below and pinned directly in their FROM lines.
