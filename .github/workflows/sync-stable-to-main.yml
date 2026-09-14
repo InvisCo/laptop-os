@@ -13,6 +13,10 @@ on:
   push:
     branches:
       - stable
+  # Safety net: GitHub push events on `stable` have blacked out before
+  # (Aug 30 - Sep 14 2026); the cron keeps hotfix sync moving regardless.
+  schedule:
+    - cron: "5 */6 * * *"
 
 permissions:
   contents: write
