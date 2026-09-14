@@ -36,13 +36,13 @@
 
 # Base Image - GNOME included (Fedora official OSTree desktop)
 # Renovate will keep the digest pin up to date.
-ARG BASE_IMAGE="quay.io/fedora-ostree-desktops/silverblue:44@sha256:0f80841efaf386db11c3bceb56d834e44f53db77f29bf83b92ca8e5f53c9a0a9"
+ARG BASE_IMAGE="quay.io/fedora-ostree-desktops/silverblue:44@sha256:065a194d83cc86785e25f0e5857f8282019fce0d4d3a64239bb148b7b3dc19c1"
 ARG ESCPR_CFLAGS="-Wno-error=implicit-function-declaration -Wno-error=implicit-int -Wno-implicit-function-declaration"
 
 # OCI context images - imported below and pinned directly in their FROM lines.
 # The base image is pinned in the FROM line below and updated by Renovate.
-FROM ghcr.io/projectbluefin/common:latest@sha256:be657eddde945b42c2e631b9e17f1786f948b757380a1e2ba504d826d0a0a8b1 AS common
-FROM ghcr.io/ublue-os/brew:latest@sha256:bed056871da6edd8c6ee455a274283ae83bf269461dcad758a7729aaad018401 AS brew
+FROM ghcr.io/projectbluefin/common:latest@sha256:cba9a07b7e699ab42923581de90254eacf624b89425be094a1588f381c7902b1 AS common
+FROM ghcr.io/ublue-os/brew:latest@sha256:60ada2d65891d8797beef49d8b43f2108519cbbaf04c9c7363e1a008677fcd35 AS brew
 
 # Context stage - combine local and imported OCI container resources
 FROM scratch AS ctx
