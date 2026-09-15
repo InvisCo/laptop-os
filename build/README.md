@@ -9,6 +9,9 @@ Scripts are named with a number prefix (e.g., `10-build.sh`, `20-onepassword.sh`
 ## Included Scripts
 
 - **`10-build.sh`** - Main build script for base system modifications, package installation, and service configuration
+- **`20-onepassword.sh`** - 1Password desktop app + CLI from the official AgileBits repository (needs a real `/opt`, not the base symlink)
+- **`30-browsers.sh`** - Brave Origin (adblock built in, no rewards/crypto/VPN — no de-bloat policies needed upstream) + LibreWolf, 1Password native-messaging bridge, managed policies from `overrides/`
+- **`40-epson-printers.sh`** - Vendored Epson drivers from `rpms/` (legacy signatures, `--nodigest --nosignature`)
 
 ## Example Scripts
 
