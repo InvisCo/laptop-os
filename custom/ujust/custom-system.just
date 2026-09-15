@@ -38,18 +38,23 @@ laptop-os-librewolf-overrides:
     echo "Overrides installed to ~/.librewolf/librewolf.overrides.cfg"
     echo "Restart LibreWolf to apply."
 
-# Configure docker and libvirt groups for development
+# Configure libvirt group for virtualisation (docker group only if installed)
 [group('System')]
 configure-dev-groups:
     #!/usr/bin/pkexec bash
     CURRENT_USER="{{ `id -un` }}"
-    echo "Adding $CURRENT_USER to docker and libvirt groups..."
+    echo "Adding $CURRENT_USER to libvirt group..."
 
     # Ensure groups exist in /etc/group
     for group in docker libvirt; do
-        if ! grep -q "^$group:" /etc/group; then
-            echo "Adding $group to /etc/group"
-            grep "^$group:" /usr/lib/group | tee -a /etc/group > /dev/null
+        if ! getent group $group >/dev/null; then
+            if grep -q "^$group:" /usr/lib/group 2>/dev/null; then
+                echo "Adding $group to /etc/group"
+                grep "^$group:" /usr/lib/group | tee -a /etc/group > /dev/null
+            else
+                echo "Skipping $group: no such group on this image."
+                continue
+            fi
         fi
         usermod -aG $group $CURRENT_USER
     done

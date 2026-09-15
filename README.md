@@ -75,23 +75,36 @@ Rollback: pick the previous deployment in GRUB (system state only, `/home` untou
 
 Run once when first switching this laptop from layered `ublue-os/bluefin:stable` to this image.
 
-### 1. Before switching — back up profiles
+### 1. Before switching — back up to external storage
+
+Everything below lives in `/var/home` and survives the switch; the tar is belt-and-braces.
 
 ```bash
-mkdir -p ~/Repositories/laptop-os-migration-backup
-cp -a ~/.var/app/org.mozilla.firefox/.mozilla/firefox ~/Repositories/laptop-os-migration-backup/
-cp -a ~/.var/app/org.mozilla.thunderbird_esr/.thunderbird ~/Repositories/laptop-os-migration-backup/ 2>/dev/null || true
+tar czf /path/to/nas/pre-migration-$(date +%Y%m%d).tar.gz \
+  ~/.var/app/org.mozilla.firefox ~/.var/app/dev.zed.Zed \
+  ~/.var/app/com.brave.Browser ~/.var/app/org.mozilla.thunderbird_esr \
+  ~/.var/app/org.mozilla.Thunderbird ~/.var/app/eu.betterbird.Betterbird \
+  ~/.config/1Password ~/.config/op ~/.config/chezmoi
 ```
 
-### 2. Switch
+### 2. Verify Signature
 
 ```bash
-sudo bootc switch --transport registry ghcr.io/invisco/laptop-os:stable-testing && reboot
+cosign verify \
+  --certificate-identity-regexp="https://github\.com/InvisCo/laptop-os/\.github/workflows/" \
+  --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \
+  ghcr.io/invisco/laptop-os:stable
 ```
 
-All previous rpm-ostree layers (1Password, virt stack, cups-pdf, Epson LocalPackages) are dropped automatically — everything is baked into the image. The old Bluefin deployment stays bootable from GRUB.
+### 3. Switch
 
-### 3. After first boot — in order
+```bash
+sudo bootc switch --transport registry ghcr.io/invisco/laptop-os:stable && reboot
+```
+
+All previous rpm-ostree layers (1Password, virt stack, cups-pdf, Epson LocalPackages) are dropped automatically — everything is baked into the image. The old Bluefin deployments stay bootable from GRUB; do not run `rpm-ostree cleanup -b` while you want that option.
+
+### 4. After first boot — in order
 
 1. Activate LibreWolf overrides:
    ```bash
@@ -101,37 +114,26 @@ All previous rpm-ostree layers (1Password, virt stack, cups-pdf, Epson LocalPack
    ```bash
    mkdir -p ~/.librewolf
    cp -a ~/.var/app/org.mozilla.firefox/.mozilla/firefox/* ~/.librewolf/
-   # if ~/.librewolf/profiles.ini doesn't exist or lacks your profile,
-   # create it pointing Path= at the copied profile directory
    ```
+   If the profile does not load, create `~/.librewolf/profiles.ini` pointing `Path=` at the copied profile directory.
 3. Launch LibreWolf: verify bookmarks, logins, extensions, and that the 1Password extension unlocks against the desktop app (native messaging symlink is baked).
-4. Verify the rest of the triangle: `op whoami`, and Brave Origin's force-installed 1Password extension.
-5. Print a test page on each Epson queue; boot a VM in virt-manager; confirm Zen Flatpak arrived (`flatpak list | grep zen`).
-6. Only after everything checks out, remove superseded Flatpaks:
+4. Migrate the Zed config into the image's RPM build, then launch and check settings:
    ```bash
-   flatpak uninstall --user org.mozilla.firefox dev.zed.Zed org.mozilla.thunderbird_esr
+   cp -a ~/.var/app/dev.zed.Zed/config/zed ~/.config/zed
+   ```
+5. 1Password needs no migration (RPM→RPM, same `~/.config/1Password` path): launch, sign in, `op whoami`.
+6. Verify Brave Origin: it ships with 1Password X force-installed. The old Brave Flatpak keeps working in parallel until you migrate its profile.
+7. Print a test page on each Epson queue; `virsh list --all` (virt stack check); confirm the Zen Flatpak arrived (`flatpak list | grep -i zen`).
+8. Only after everything checks out, remove superseded Flatpaks (no `--delete-data` — data stays in `~/.var/app` and on the NAS):
+   ```bash
+   flatpak uninstall org.mozilla.firefox dev.zed.Zed org.mozilla.thunderbird_esr org.mozilla.Thunderbird
    ```
 
 Thunderbird account migration to Betterbird is not needed if you keep the Betterbird Flatpak (its own profile is untouched); copy Thunderbird's profile only if you want its accounts inside Betterbird.
 
-### 4. Go to production
+### Rollback
 
-After stable-testing survives a few days:
-
-```bash
-sudo bootc switch --transport registry ghcr.io/invisco/laptop-os:stable && reboot
-```
-
-Future updates arrive automatically via staged updates against this image.
-
-## Verify Signature
-
-```bash
-cosign verify \
-  --certificate-identity-regexp="https://github\.com/InvisCo/laptop-os/\.github/workflows/" \
-  --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \
-  ghcr.io/invisco/laptop-os:stable
-```
+Pick the previous Bluefin deployment in GRUB and reboot. `/var/home` is untouched — flatpaks, profiles, keyring, and `/home/linuxbrew` all survive. If the old deployments were ever pruned, `bootc switch --transport registry ghcr.io/ublue-os/bluefin:stable` re-pulls the base image.
 
 ## Gotchas (learned here)
 

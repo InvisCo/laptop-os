@@ -23,10 +23,10 @@
 #
 # 1. Context Stage (ctx) - Combines resources from:
 #    - Local build scripts and custom files
-#    - @projectbluefin/common - Desktop configuration shared with Aurora
 #    - @ublue-os/brew - Homebrew integration
 #
 # 2. Base Image Options (edit the FROM line below):
+#    - `ghcr.io/ublue-os/bluefin:stable` (Bluefin F44 + GNOME, recommended)
 #    - `quay.io/fedora-ostree-desktops/silverblue:44` (Fedora 44 and GNOME)
 #    - `quay.io/fedora-ostree-desktops/base-main:44` (Fedora 44, no desktop)
 #    - `quay.io/centos-bootc/centos-bootc:stream10` (CentOS-based)
@@ -34,14 +34,13 @@
 # See: https://docs.projectbluefin.io/contributing/ for architecture diagram
 ###############################################################################
 
-# Base Image - GNOME included (Fedora official OSTree desktop)
+# Base Image - Bluefin stable (F44, GNOME, kernel/akmods/udev/ujust/uupd baked in)
 # Renovate will keep the digest pin up to date.
-ARG BASE_IMAGE="quay.io/fedora-ostree-desktops/silverblue:44@sha256:a9a512db5bfce55bb43bbf2a9a8d110b63579d166105a5e2c934b6640e62d7b2"
+ARG BASE_IMAGE="ghcr.io/ublue-os/bluefin:stable@sha256:71a328c539a63bd8ff3aab0c5dcb047d094d8cade6c7bb3473200053edc265de"
 ARG ESCPR_CFLAGS="-Wno-error=implicit-function-declaration -Wno-error=implicit-int -Wno-implicit-function-declaration"
 
 # OCI context images - imported below and pinned directly in their FROM lines.
 # The base image is pinned in the FROM line below and updated by Renovate.
-FROM ghcr.io/projectbluefin/common:latest@sha256:cba9a07b7e699ab42923581de90254eacf624b89425be094a1588f381c7902b1 AS common
 FROM ghcr.io/ublue-os/brew:latest@sha256:60ada2d65891d8797beef49d8b43f2108519cbbaf04c9c7363e1a008677fcd35 AS brew
 
 # Context stage - combine local and imported OCI container resources
@@ -53,7 +52,6 @@ COPY rpms /rpms
 COPY overrides /overrides
 
 # Copy from OCI containers to distinct subdirectories to avoid conflicts
-COPY --from=common /system_files /oci/common
 COPY --from=brew /system_files /oci/brew
 
 # Builder for Epson escpr (L4160/L3250) — keeps gcc/cups-devel out of final image
@@ -76,6 +74,7 @@ FROM ${BASE_IMAGE}
 # recognize your image. Change these to match your project name.
 ARG IMAGE_NAME="laptop-os"
 ARG IMAGE_VENDOR="projectbluefin"
+ARG IMAGE_PRETTY_NAME="Laptop OS"
 ARG UBLUE_IMAGE_TAG="stable"
 ARG BASE_IMAGE_NAME="silverblue"
 ARG FEDORA_MAJOR_VERSION="44"
@@ -86,7 +85,6 @@ ARG VERSION=""
 ## The following RUN directives mount the ctx stage which includes:
 ##   - Local build scripts from /build
 ##   - Local custom files from /custom
-##   - Files from @projectbluefin/common at /oci/common (includes branding/artwork content)
 ##   - Files from @ublue-os/brew at /oci/brew
 ## Scripts are run in numerical order (10-build.sh, 20-example.sh, etc.)
 

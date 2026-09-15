@@ -10,6 +10,7 @@ set -euo pipefail
 #
 # Required env vars (set as ARGs in Containerfile):
 #   IMAGE_NAME          - Image name (e.g. finpilot, my-custom-os)
+#   IMAGE_PRETTY_NAME   - Human-readable name (e.g. Laptop OS) for GRUB/PRETTY_NAME
 #   IMAGE_VENDOR        - Image vendor/owner (e.g. github username or org)
 #   UBLUE_IMAGE_TAG     - Image tag/stream (e.g. stable, testing, latest)
 #   BASE_IMAGE_NAME     - Base image name (e.g. silverblue)
@@ -19,7 +20,7 @@ set -euo pipefail
 ###############################################################################
 
 # Branding — customize these for your image
-IMAGE_PRETTY_NAME="${IMAGE_PRETTY_NAME:-My Custom OS}"
+IMAGE_PRETTY_NAME="${IMAGE_PRETTY_NAME:-Laptop OS}"
 IMAGE_LIKE="${IMAGE_LIKE:-fedora}"
 HOME_URL="${HOME_URL:-https://github.com/${IMAGE_VENDOR}/${IMAGE_NAME}}"
 DOCUMENTATION_URL="${DOCUMENTATION_URL:-https://github.com/${IMAGE_VENDOR}/${IMAGE_NAME}/blob/main/README.md}"
@@ -64,8 +65,13 @@ echo "  image-vendor: ${IMAGE_VENDOR}"
 ###############################################################################
 # Customize /usr/lib/os-release
 ###############################################################################
-# Only modify if the file exists and VARIANT_ID is not already set
-if [[ -f "${OS_RELEASE}" ]] && ! grep -q "^VARIANT_ID=" "${OS_RELEASE}"; then
+# Bluefin pattern: sed-replace the keys the base image ships so kernel-install
+# (20-grub.install mkbls: title from NAME + VERSION) picks up our branding.
+# Appending duplicate keys does NOT work — first occurrence wins. ID stays
+# fedora (BIB manifest lookup + EFIDIR shim path depend on it); ID_LIKE marks
+# the lineage. GRUB titles on already-deployed systems refresh on the next
+# kernel reinstall via `bootc upgrade`.
+if [[ -f "${OS_RELEASE}" ]]; then
 	# Read existing values
 	if [[ -n "${VERSION:-}" ]]; then
 		OS_VERSION="${VERSION}"
@@ -73,21 +79,27 @@ if [[ -f "${OS_RELEASE}" ]] && ! grep -q "^VARIANT_ID=" "${OS_RELEASE}"; then
 		OS_VERSION="${UBLUE_IMAGE_TAG}"
 	fi
 
-	# Append our identity
-	cat >>"${OS_RELEASE}" <<EOF
+	set_key() {
+		local key="$1" value="$2"
+		if grep -q "^${key}=" "${OS_RELEASE}"; then
+			sed -i "s|^${key}=.*|${key}=\"${value}\"|" "${OS_RELEASE}"
+		else
+			echo "${key}=\"${value}\"" >>"${OS_RELEASE}"
+		fi
+	}
 
-# ${IMAGE_NAME} image identity
-VARIANT_ID="${IMAGE_FLAVOR}"
-PRETTY_NAME="${IMAGE_PRETTY_NAME}"
-NAME="${IMAGE_NAME}"
-IMAGE_ID="${IMAGE_NAME}"
-IMAGE_VERSION="${OS_VERSION}"
-ID_LIKE="${IMAGE_LIKE}"
-HOME_URL="${HOME_URL}"
-DOCUMENTATION_URL="${DOCUMENTATION_URL}"
-SUPPORT_URL="${SUPPORT_URL}"
-BUG_REPORT_URL="${BUG_REPORT_URL}"
-EOF
+	set_key "NAME" "${IMAGE_NAME}"
+	set_key "PRETTY_NAME" "${IMAGE_PRETTY_NAME} (${OS_VERSION})"
+	set_key "VARIANT" "${IMAGE_PRETTY_NAME}"
+	set_key "VARIANT_ID" "${IMAGE_FLAVOR}"
+	set_key "VERSION" "${OS_VERSION}"
+	set_key "IMAGE_ID" "${IMAGE_NAME}"
+	set_key "IMAGE_VERSION" "${OS_VERSION}"
+	set_key "ID_LIKE" "${IMAGE_LIKE}"
+	set_key "HOME_URL" "${HOME_URL}"
+	set_key "DOCUMENTATION_URL" "${DOCUMENTATION_URL}"
+	set_key "SUPPORT_URL" "${SUPPORT_URL}"
+	set_key "BUG_REPORT_URL" "${BUG_REPORT_URL}"
 
-	echo "Customized ${OS_RELEASE}"
+	echo "Rebranded ${OS_RELEASE} as ${IMAGE_PRETTY_NAME}"
 fi

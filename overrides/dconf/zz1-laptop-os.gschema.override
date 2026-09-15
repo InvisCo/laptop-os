@@ -1,0 +1,12 @@
+# laptop-os dock defaults (Bluefin dash-to-dock, laptop-os favorites).
+# Installed to /usr/share/glib-2.0/schemas/zz1-laptop-os.gschema.override by
+# build/10-build.sh, then glib-compile-schemas. The zz1- prefix wins over
+# Bluefin's zz0-bluefin-modifications override for favorite-apps only; all
+# other Bluefin GNOME defaults stay untouched.
+# New users only — existing ~/.config/dconf/user DBs shadow these defaults.
+# Migrated users: run `ujust set-dock-layout` to apply to the live user DB.
+# NOTE: librewolf.desktop / brave-browser.desktop are verified at build time
+# via `rpm -ql <pkg> | grep desktop`. A wrong ID silently vanishes from the
+# dock, so update this list if either RPM renames its .desktop file.
+[org.gnome.shell]
+favorite-apps = ['app.zen_browser.zen.desktop', 'librewolf.desktop', 'brave-browser.desktop', 'org.gnome.Nautilus.desktop', 'eu.betterbird.Betterbird.desktop', 'org.gnome.Ptyxis.desktop', 'org.gnome.gitlab.cheywood.Buffer.desktop']
