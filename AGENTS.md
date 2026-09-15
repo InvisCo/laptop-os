@@ -14,12 +14,21 @@ links lives in `.agents/skills/README.md`.
 
 - `main` is the **testing branch** — all feature and Renovate PRs land here,
   and pushes publish `:stable-testing` images.
-- `stable` is the **production branch** — pushes publish `:stable` images.
-- Promotion is `main` → `stable` via squash PRs opened by
-  `.github/workflows/promote-main-to-stable.yml`, a thin caller of the factory
-  reusable `projectbluefin/actions/.github/workflows/reusable-promote-squash.yml`.
-  `sync-stable-to-main.yml` (`reusable-sync-branches.yml`) merges any direct
-  `stable` hotfixes back into `main`.
+- `stable` is the **production branch** — pushes publish `:stable` images
+  (a push is skipped when its diff only touches `paths-ignore` files; the
+  `publish-stable` job below compensates).
+- Promotion is `main` → `stable` via PRs opened by
+  `.github/workflows/promote-main-to-stable.yml`, a local replacement for the
+  factory `projectbluefin/actions` `reusable-promote-squash.yml`.
+  Promotions merge via **fast-forward** — `stable` becomes `main`'s exact SHA
+  and never gains unique commits, so promotion PRs cannot conflict (squash
+  promotions created stable-only commits and recurring `Containerfile` merge
+  conflicts). A `--merge` fallback covers direct `stable` hotfixes, which
+  `sync-stable-to-main.yml` (`reusable-sync-branches.yml`) merges back into
+  `main` (on stable push and on a 6-hour cron). A `publish-stable` job in the
+  promotion workflow dispatches a `stable` build whenever the branch's tree
+  lags the last successful `:stable` build (covers `paths-ignore` pushes and
+  push-event blackouts).
 - Decision record: the factory reusable workflow was chosen over the external
   pull[bot] app (issues #235/#237). Do not add `.github/pull.yml`.
 - Never commit directly to `stable`; it receives only promotion PRs.

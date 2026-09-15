@@ -71,6 +71,9 @@ description: >-
 | CI build fails: composite action not found                              | Wrong commit SHA or repo name in `uses:`                                                                                                    | Verify `projectbluefin/actions` SHA, check network access                                                                 |
 | CI build succeeds but image not published                               | Wrong `IMAGE_NAME` or `IMAGE_VENDOR`                                                                                                        | Check `Containerfile` ARGs, verify `clean.yml` package name matches                                                       |
 | Promotion gate blocked: `release/blocked`, cosign "no signatures found" | Image pushed by an older template snapshot before signing was default, or the `Sign and publish` step failed silently (`continue-on-error`) | Merge a new build on `main` so a signed `:testing` image is published; check the build log's sign step for errors         |
+| Push to `stable` fires no Actions runs | GitHub push-event blackout on the branch (observed Aug 30 - Sep 14 2026; self-resolved) | Check `gh api repos/OWNER/REPO/actions/runs?branch=stable`; publish with `gh workflow run build-image.yml --repo OWNER/REPO --ref stable`; the `publish-stable` job self-heals on the next `main` push |
+| Promotion merged but `:stable` image not updated | Promotion diff only touched `paths-ignore` files (validate workflows, `.md`), so the `stable` build was skipped | `gh workflow run build-image.yml --repo OWNER/REPO --ref stable`, or wait for the `publish-stable` job on the next `main` push |
+| GHCR push fails: `uploading layer chunked: StatusCode: 400 <html>` | Transient registry gateway error mid-upload | Rerun the failed build (`gh run rerun <id>` or `gh workflow run`); if it persists, check GHCR status and file upstream |
 
 ## Runtime Issues
 

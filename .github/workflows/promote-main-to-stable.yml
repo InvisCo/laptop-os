@@ -4,11 +4,24 @@ name: Promote main to stable
 # Local replacement for projectbluefin/actions reusable-promote-squash.yml.
 # The factory reusable requests review from an `<owner>/maintainers` team,
 # which does not exist on personal accounts. This thin local version keeps
-# the same contract: every push to `main` opens (or refreshes) a squash
-# promotion PR from `main` to `stable`; merging it publishes `:stable`.
+# the same contract: every push to `main` opens (or refreshes) a promotion
+# PR from `main` to `stable`; merging it publishes `:stable`.
+#
+# Promotions merge via fast-forward: `stable` becomes `main`'s exact SHA and
+# never gains unique commits, so promotion PRs cannot conflict. A `--merge`
+# fallback is used only when `stable` has commits `main` lacks (direct
+# hotfixes); `sync-stable-to-main.yml` pulls those back into `main`.
+#
+# `build-image.yml` skips pushes whose diff only touches `paths-ignore`
+# files, and push events on `stable` have blacked out before (Aug 30 -
+# Sep 14 2026). The `publish-stable` job below dispatches a `stable` build
+# whenever the branch's tree lags the last successful `:stable` build, so
+# the image can never silently go stale.
 #
 # Differences from upstream:
 # - No reviewer request (personal account)
+# - Fast-forward merge instead of squash (stable never gains unique commits)
+# - `publish-stable` job keeps the `:stable` image in sync with the branch
 # - No cosign release-gate callout (advisory upstream; signing is still
 #   performed keylessly in build-image.yml)
 # - Seeds `stable` from `main` on first run (template ships without `stable`)
@@ -52,8 +65,8 @@ jobs:
           fi
 
           git fetch origin main stable
-          if [ "$(git rev-parse origin/main)" = "$(git rev-parse origin/stable)" ]; then
-            echo "main and stable are in sync - nothing to promote."
+          if git diff --quiet origin/main origin/stable; then
+            echo "main and stable have identical trees - nothing to promote."
             exit 0
           fi
 
@@ -68,6 +81,47 @@ jobs:
             echo "Promotion PR #$NUMBER already open (auto-refreshes with main)."
           fi
 
-          # Best effort: enable auto-merge if repo settings allow it
-          gh pr merge --auto --squash --repo "$REPO" "$NUMBER" || \
-            echo "::notice::Auto-merge not enabled yet - merge PR #$NUMBER manually after CI passes."
+          # Best effort: enable auto-merge if repo settings allow it.
+          # Fast-forward in the normal case (stable behind main): stable becomes
+          # main's exact SHA. Fall back to a merge commit only when stable has
+          # commits main lacks (direct hotfixes).
+          if git merge-base --is-ancestor origin/stable origin/main; then
+            gh pr merge --auto --ff-only --repo "$REPO" "$NUMBER" || \
+              echo "::notice::Auto-merge not enabled yet - merge PR #$NUMBER manually after CI passes."
+          else
+            gh pr merge --auto --merge --repo "$REPO" "$NUMBER" || \
+              echo "::notice::Auto-merge not enabled yet - merge PR #$NUMBER manually after CI passes."
+          fi
+
+  publish-stable:
+    name: Publish stable build when behind
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: write
+    steps:
+      - name: Checkout full history
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+
+      - name: Dispatch stable build when stable tree lags last built tree
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          git fetch origin stable
+          STABLE_TREE="$(git rev-parse 'origin/stable^{tree}')"
+          LAST_BUILT="$(gh api "repos/$REPO/actions/runs?branch=stable&per_page=20" \
+            --jq '.workflow_runs[] | select(.name=="Build and Push Image") | select(.conclusion=="success") | .head_sha' | head -1 || true)"
+          LAST_TREE=""
+          if [ -n "$LAST_BUILT" ]; then
+            LAST_TREE="$(git rev-parse "$LAST_BUILT^{tree}" 2>/dev/null || true)"
+          fi
+          if [ "$LAST_TREE" != "$STABLE_TREE" ]; then
+            echo "Stable tree differs from last built tree (or none yet) - dispatching build."
+            gh workflow run build-image.yml --repo "$REPO" --ref stable
+          else
+            echo "Stable is up to date with the last successful build."
+          fi

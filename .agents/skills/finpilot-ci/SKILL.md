@@ -33,9 +33,9 @@ description: >-
 
 | File                          | Trigger                           | Purpose                                                       |
 | ----------------------------- | --------------------------------- | ------------------------------------------------------------- |
-| `build-image.yml`             | push main + stable, manual        | Publish `:stable-testing` (main) or `:stable` (stable)        |
-| `promote-main-to-stable.yml`  | push main, manual                 | Squash promotion PR `main` → `stable` via factory reusable    |
-| `sync-stable-to-main.yml`     | push stable                       | Merge direct `stable` hotfixes back to `main` (usually no-op) |
+| `build-image.yml`             | push main + stable, manual        | Publish `:stable-testing` (main) or `:stable` (stable); skips pushes whose diff only touches `paths-ignore` files |
+| `promote-main-to-stable.yml`  | push main, manual                 | Open/refresh promotion PR `main` → `stable` (fast-forward, `--merge` fallback); `publish-stable` job dispatches a `stable` build when the branch lags the last built tree |
+| `sync-stable-to-main.yml`     | push stable + 6h cron             | Merge direct `stable` hotfixes back to `main` (usually no-op) |
 | `pr-validation.yml`           | PR → main                         | shellcheck + hadolint + pre-commit via `validate-pr`          |
 | `renovate.yml`                | schedule 6h, push renovate config | Self-hosted Renovate runner                                   |
 | `clean.yml`                   | schedule weekly                   | Delete GHCR images older than 90 days                         |
@@ -49,9 +49,22 @@ description: >-
 - `main` is the testing branch and publishes `:stable-testing` (plus bare
   `:testing`, which the promotion release gate resolves).
 - `stable` is the production branch and publishes `:stable`.
-- Promotion uses `reusable-promote-squash.yml` and `reusable-sync-branches.yml`
-  from `projectbluefin/actions` — the factory contract. pull[bot] /
-  `.github/pull.yml` was rejected (issues #235/#237); do not add it.
+- Promotion is a local `promote-main-to-stable.yml` (replacement for the
+  factory `reusable-promote-squash.yml`, which requires a maintainer team).
+  Promotions merge via **fast-forward** — `stable` becomes `main`'s exact
+  SHA and never gains unique commits, so promotion PRs cannot conflict
+  (squash promotions created stable-only commits and recurring
+  `Containerfile` merge conflicts). A `--merge` fallback covers direct
+  `stable` hotfixes; `sync-stable-to-main.yml`
+  (`reusable-sync-branches.yml`) pulls those back on stable push and on a
+  6-hour cron. pull[bot] / `.github/pull.yml` was rejected (issues #235/#237);
+  do not add it.
+- `build-image.yml` skips pushes whose diff only touches `paths-ignore`
+  files (e.g. `.md`, validate workflows), and GitHub push events on `stable`
+  have blacked out before (Aug 30 - Sep 14 2026). The `publish-stable` job
+  in `promote-main-to-stable.yml` dispatches a `stable` build whenever the
+  branch's tree lags the last successful `:stable` build, so the image
+  cannot silently go stale.
 - The `Determine image tag` step sets `TAG_STREAM=testing` off the production
   branch; `Finalize branch tags` renames `testing*` tags to `stable-testing-*`
   so they never collide with production `stable-daily*` aliases.
