@@ -1,11 +1,6 @@
 {
-  "BraveRewardsDisabled": true,
-  "BraveWalletDisabled": true,
-  "BraveVPNDisabled": true,
-  "BraveTorDisabled": true,
-  "BraveAIChatEnabled": false,
-  "BraveSyncUrl": "",
   "PasswordManagerEnabled": false,
+  "BraveSyncAllowed": false,
   "ExtensionSettings": {
     "aeblfdkhhhdcdjpifhhbdiojplfjncoa": {
       "installation_mode": "force_installed",

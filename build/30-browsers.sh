@@ -4,13 +4,14 @@
 set -euo pipefail
 
 ###############################################################################
-# Native browsers: Brave (RPM, de-bloated via managed policies) and LibreWolf
-# (RPM from the official signed repository, with 1Password native-messaging
-# bridge). Firefox is intentionally NOT shipped; LibreWolf is the primary.
+# Native browsers: Brave Origin (RPM, adblock built in, no rewards/crypto/VPN)
+# and LibreWolf (RPM from the official signed repository, with 1Password
+# native-messaging bridge). Firefox is intentionally NOT shipped;
+# LibreWolf is the primary.
 ###############################################################################
 
-### Brave Browser from official repository
-echo "Installing Brave..."
+### Brave Origin from official repository
+echo "Installing Brave Origin..."
 
 cat >/etc/yum.repos.d/brave-browser.repo <<'EOF'
 [brave-browser]
@@ -21,11 +22,11 @@ gpgcheck=1
 gpgkey=https://brave-browser-rpm-release.s3.brave.com/brave-core.asc
 EOF
 
-dnf5 install -y brave-browser
+dnf5 install -y brave-origin
 
 rm -f /etc/yum.repos.d/brave-browser.repo
 
-echo "Brave installed successfully"
+echo "Brave Origin installed successfully"
 
 ### LibreWolf from official signed repository
 echo "Installing LibreWolf..."
@@ -55,10 +56,12 @@ echo "Wiring 1Password native messaging into LibreWolf..."
 mkdir -p /usr/lib/librewolf
 ln -sfn /usr/lib64/mozilla/native-messaging-hosts /usr/lib/librewolf/native-messaging-hosts
 
-### Managed policies (de-bloat + password manager offloading)
+### Managed policies (password manager offloading)
 echo "Installing browser policies..."
 
-# Brave: managed enterprise policies
+# Brave Origin: already debloated upstream (no rewards/crypto wallet/VPN/Tor).
+# The policy turns off sync and the built-in password manager (1Password is
+# the password manager) and force-installs the 1Password extension.
 mkdir -p /etc/brave/policies/managed
 install -m 0644 /ctx/overrides/brave/laptop-os.json \
     /etc/brave/policies/managed/laptop-os.json
