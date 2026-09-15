@@ -132,6 +132,7 @@ build $target_image=IMAGE_NAME $tag=DEFAULT_TAG:
     # Override via env vars: IMAGE_NAME, IMAGE_VENDOR, UBLUE_IMAGE_TAG
     BUILD_ARGS+=("--build-arg" "IMAGE_NAME=${IMAGE_NAME:-${target_image}}")
     BUILD_ARGS+=("--build-arg" "IMAGE_VENDOR=${IMAGE_VENDOR:-${REPO_ORG}}")
+    BUILD_ARGS+=("--build-arg" "IMAGE_PRETTY_NAME=${IMAGE_PRETTY_NAME:-Laptop OS}")
     BUILD_ARGS+=("--build-arg" "UBLUE_IMAGE_TAG=${UBLUE_IMAGE_TAG:-${tag}}")
 
     # Add GitHub token as build secret if available (for CI/CD)

@@ -7,35 +7,35 @@ Branch=stable
 [Flatpak Preinstall org.gnome.gitlab.somas.Apostrophe]
 Branch=stable
 
-[Flatpak Preinstall https://flathub.org/apps/eu.betterbird.Betterbird]
+[Flatpak Preinstall eu.betterbird.Betterbird]
 Branch=stable
 
-[Flatpak Preinstall https://flathub.org/apps/org.gimp.GIMP]
+[Flatpak Preinstall org.gimp.GIMP]
 Branch=stable
 
-[Flatpak Preinstall https://flathub.org/apps/org.inkscape.Inkscape]
+[Flatpak Preinstall org.inkscape.Inkscape]
 Branch=stable
 
-[Flatpak Preinstall https://flathub.org/apps/org.libreoffice.LibreOffice]
+[Flatpak Preinstall org.libreoffice.LibreOffice]
 Branch=stable
 
-[Flatpak Preinstall https://flathub.org/apps/org.kde.okular]
+[Flatpak Preinstall org.kde.okular]
 Branch=stable
 
-[Flatpak Preinstall https://flathub.org/apps/org.onlyoffice.desktopeditors]
+[Flatpak Preinstall org.onlyoffice.desktopeditors]
 Branch=stable
 
-[Flatpak Preinstall https://flathub.org/apps/com.protonvpn.www]
+[Flatpak Preinstall com.protonvpn.www]
 Branch=stable
 
-[Flatpak Preinstall https://flathub.org/apps/org.rncbc.qpwgraph]
+[Flatpak Preinstall org.rncbc.qpwgraph]
 Branch=stable
 
-[Flatpak Preinstall https://flathub.org/apps/com.rawtherapee.RawTherapee]
+[Flatpak Preinstall com.rawtherapee.RawTherapee]
 Branch=stable
 
-[Flatpak Preinstall https://flathub.org/apps/org.remmina.Remmina]
+[Flatpak Preinstall org.remmina.Remmina]
 Branch=stable
 
-[Flatpak Preinstall https://flathub.org/apps/com.rustdesk.RustDesk]
+[Flatpak Preinstall com.rustdesk.RustDesk]
 Branch=stable
