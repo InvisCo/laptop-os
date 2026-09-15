@@ -14,19 +14,19 @@ Published as `ghcr.io/invisco/laptop-os:{stable,stable-testing,testing}`, keyles
 - **1Password**: desktop app + CLI (`1password`, `1password-cli`) from the official AgileBits RPM repository, so the app, CLI, and browser extensions share native messaging without any sandbox in between.
 - **Browsers (native RPMs only — no Flatpak browsers)**:
   - **LibreWolf** (primary) from the official signed `repo.librewolf.net` repository, with the 1Password native-messaging symlink baked in.
-  - **Brave** from the official Brave RPM repository, de-bloated via managed policies (Rewards/Wallet/VPN/Tor/AI-chat off, built-in password manager off, 1Password extension force-installed).
+  - **Brave Origin** from the official Brave RPM repository — adblock built in, no Rewards/Wallet/VPN/Tor; built-in password manager off via managed policy, 1Password extension force-installed.
 - **Zed editor** via the `cjatherton/zed` COPR (isolated enable, upstream-tracked releases).
 - **Epson printer drivers**: vendored RPMs (`epson-inkjet-printer-201207w`/`201215w` for L355/M105 + `epson-inkjet-printer-escpr` 1.8.8 src.rpm for L4160/L3250 via https://github.com/vmartins/epson-inkjet-printer-escpr) under `rpms/` with SHA256 checksums.
 
 ### Added Applications (Runtime)
 
-- **GUI Apps (Flatpak)**: Zen browser (`app.zen_browser.zen`) as a casual secondary browser.
+- **GUI Apps (Flatpak, first boot)**: 14 apps — Zen browser (casual secondary browser), Betterbird, Apostrophe, GIMP, Inkscape, LibreOffice, Okular, OnlyOffice, ProtonVPN, QPWGraph, RawTherapee, Remmina, RustDesk.
 
 ### Removed/Disabled
 
 - No Firefox RPM or Flatpak browser baked in; LibreWolf replaces Firefox, profiles migrate at deploy time.
-- Brave crypto wallet/rewards/VPN/news disabled via `/etc/brave/policies/managed/laptop-os.json`.
-- Google Safe Browsing stays off (LibreWolf default); uBlock Origin covers mal-domain blocking.
+- Brave Origin ships without crypto wallet/rewards/VPN (no de-bloat needed); sync and the built-in password manager are turned off via `/etc/brave/policies/managed/laptop-os.json`.
+- Google Safe Browsing stays off (LibreWolf default).
 
 ### Configuration Changes
 
@@ -34,7 +34,7 @@ Published as `ghcr.io/invisco/laptop-os:{stable,stable-testing,testing}`, keyles
 - 1Password native messaging bridged into LibreWolf: `/usr/lib64/mozilla/native-messaging-hosts -> /usr/lib/librewolf/native-messaging-hosts`.
 - `libvirtd.socket` + `libvirtd.service` enabled at boot.
 
-_Last updated: 2026-08-24_
+_Last updated: 2026-09-15_
 
 ## Repository Layout
 
@@ -43,12 +43,12 @@ _Last updated: 2026-08-24_
 | `Containerfile` | Multi-stage build; pins `common`/`brew`/base digests (Renovate bumps) |
 | `build/10-build.sh` | Fedora packages (cups-pdf, virt stack) + Zed COPR + services |
 | `build/20-onepassword.sh` | 1Password repo + install + sysusers.d |
-| `build/30-browsers.sh` | Brave + LibreWolf repos, native-messaging symlink, policies |
+| `build/30-browsers.sh` | Brave Origin + LibreWolf repos, native-messaging symlink, policies |
 | `build/40-epson-printers.sh` | Vendored Epson RPMs (`--nodigest`, legacy signatures) |
 | `overrides/brave/laptop-os.json` | Brave managed policies |
 | `overrides/librewolf/librewolf.overrides.cfg` | LibreWolf loosened prefs (source of truth) |
 | `rpms/` | Vendored Epson drivers + SHA256SUMS |
-| `custom/flatpaks/default.preinstall` | First-boot Flatpaks (Zen) |
+| `custom/flatpaks/default.preinstall` | First-boot Flatpaks (14 apps) |
 | `custom/ujust/custom-system.just` | `ujust` recipes incl. overrides activation |
 
 Deeper guides live in each subdirectory's `README.md`; template architecture doc is [upstream](https://github.com/projectbluefin/finpilot#architecture).
@@ -64,7 +64,7 @@ Two-branch model:
 
 1. Change something locally, run `just build` to smoke-test (~10 min).
 2. Push to `main` → CI builds/pushes `:stable-testing`.
-3. `promote-main-to-stable.yml` opens a squash PR `main`→`stable` (local workflow — the upstream reusable requires an org `maintainers` team). Auto-merge is enabled.
+3. `promote-main-to-stable.yml` opens a fast-forward PR `main`→`stable` (`--ff-only`, `--merge` fallback for direct hotfixes) — local workflow, the upstream reusable requires an org `maintainers` team; `publish-stable` builds `:stable` whenever the branch lags the last successful build.
 4. Merge publishes `:stable`.
 
 Note: pushes made by `GITHUB_TOKEN` don't trigger workflows — the first-ever promotion seeded `stable` directly and needed a manual `workflow_dispatch` build on the stable branch.
@@ -105,7 +105,7 @@ All previous rpm-ostree layers (1Password, virt stack, cups-pdf, Epson LocalPack
    # create it pointing Path= at the copied profile directory
    ```
 3. Launch LibreWolf: verify bookmarks, logins, extensions, and that the 1Password extension unlocks against the desktop app (native messaging symlink is baked).
-4. Verify the rest of the triangle: `op whoami`, and Brave's force-installed 1Password extension.
+4. Verify the rest of the triangle: `op whoami`, and Brave Origin's force-installed 1Password extension.
 5. Print a test page on each Epson queue; boot a VM in virt-manager; confirm Zen Flatpak arrived (`flatpak list | grep zen`).
 6. Only after everything checks out, remove superseded Flatpaks:
    ```bash
@@ -135,7 +135,7 @@ cosign verify \
 
 ## Gotchas (learned here)
 
-- **Real `/opt` required**: base image symlinks `/opt -> /var/opt`, which breaks rpm unpacking of 1Password/Brave. Containerfile converts it to a real directory before build scripts; do not restore the symlink.
+- **Real `/opt` required**: base image symlinks `/opt -> /var/opt`, which breaks rpm unpacking of 1Password/Brave Origin. Containerfile converts it to a real directory before build scripts; do not restore the symlink.
 - **Epson RPMs are legacy-signed**: need `rpm --nodigest --nosignature`; integrity enforced by `rpms/SHA256SUMS`.
 - **bootc lint sysusers check**: RPMs creating groups without sysusers.d fragments fail `--fatal-warnings` (see `20-onepassword.sh`).
 - **Build scripts must be executable** — `chmod +x build/*.sh` or CI fails with `Permission denied`.
