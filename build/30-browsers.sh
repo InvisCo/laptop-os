@@ -74,7 +74,7 @@ install -m 0644 /ctx/overrides/librewolf/librewolf.overrides.cfg \
 
 # Verify the .desktop IDs the dock override expects. A renamed .desktop file
 # silently vanishes from favorite-apps, so fail loudly here instead.
-for desktop_id in librewolf.desktop brave-browser.desktop; do
+for desktop_id in librewolf.desktop brave-origin.desktop; do
     if ! ls /usr/share/applications/"${desktop_id}" >/dev/null 2>&1; then
         echo "WARNING: expected /usr/share/applications/${desktop_id} not found."
         echo "Installed browser .desktop files:"

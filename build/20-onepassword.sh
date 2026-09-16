@@ -34,6 +34,15 @@ g onepassword-cli -
 g onepassword-mcp -
 EOF
 
+# Trust LibreWolf for browser integration. 1Password only talks to allowlisted
+# browser binaries; forks like LibreWolf need an entry in
+# /etc/1password/custom_allowed_browsers (root-owned, per 1Password docs
+# "Connect additional browsers to the 1Password app").
+mkdir -p /etc/1password
+echo "librewolf" >/etc/1password/custom_allowed_browsers
+chown root:root /etc/1password/custom_allowed_browsers
+chmod 0644 /etc/1password/custom_allowed_browsers
+
 # Clean up repo file (required - repos don't work at runtime in bootc images)
 rm -f /etc/yum.repos.d/1password.repo
 

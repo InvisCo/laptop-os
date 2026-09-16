@@ -5,8 +5,9 @@
 # other Bluefin GNOME defaults stay untouched.
 # New users only — existing ~/.config/dconf/user DBs shadow these defaults.
 # Migrated users: run `ujust set-dock-layout` to apply to the live user DB.
-# NOTE: librewolf.desktop / brave-browser.desktop are verified at build time
-# via `rpm -ql <pkg> | grep desktop`. A wrong ID silently vanishes from the
-# dock, so update this list if either RPM renames its .desktop file.
+# NOTE: brave-origin.desktop verified on-device (Brave Origin RPM ships its
+# own .desktop name, not brave-browser.desktop). A wrong ID silently vanishes
+# from the dock, so re-verify with `ls /usr/share/applications | grep -i brave`
+# if the RPM ever renames it.
 [org.gnome.shell]
-favorite-apps = ['app.zen_browser.zen.desktop', 'librewolf.desktop', 'brave-browser.desktop', 'org.gnome.Nautilus.desktop', 'eu.betterbird.Betterbird.desktop', 'org.gnome.Ptyxis.desktop', 'org.gnome.gitlab.cheywood.Buffer.desktop']
+favorite-apps = ['app.zen_browser.zen.desktop', 'librewolf.desktop', 'brave-origin.desktop', 'org.gnome.Nautilus.desktop', 'eu.betterbird.Betterbird.desktop', 'org.gnome.Ptyxis.desktop', 'org.gnome.gitlab.cheywood.Buffer.desktop']
