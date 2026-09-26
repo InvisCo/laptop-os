@@ -16,7 +16,12 @@ jobs:
       - name: Set up Flathub
         shell: bash
         run: |
-          sudo apt install -y flatpak
+          # GitHub's apt mirror intermittently 404s on freshly-published debs
+          # (e.g. xdg-desktop-portal). Fall back to archive.ubuntu.com so the
+          # validation step is not at the mercy of mirror sync lag.
+          sudo rm -f /etc/apt/apt-mirrors.txt
+          sudo apt-get update
+          sudo apt-get install -y flatpak
           flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
 
       - name: Validate Flatpaks
