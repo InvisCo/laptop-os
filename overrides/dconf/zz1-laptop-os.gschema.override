@@ -10,4 +10,4 @@
 # from the dock, so re-verify with `ls /usr/share/applications | grep -i brave`
 # if the RPM ever renames it.
 [org.gnome.shell]
-favorite-apps = ['app.zen_browser.zen.desktop', 'librewolf.desktop', 'brave-origin.desktop', 'org.gnome.Nautilus.desktop', 'eu.betterbird.Betterbird.desktop', 'org.gnome.Ptyxis.desktop', 'org.gnome.gitlab.cheywood.Buffer.desktop']
+favorite-apps = ['librewolf.desktop', 'brave-origin.desktop', 'org.gnome.Nautilus.desktop', 'eu.betterbird.Betterbird.desktop', 'org.gnome.Ptyxis.desktop', 'org.gnome.gitlab.cheywood.Buffer.desktop']
