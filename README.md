@@ -20,7 +20,7 @@ Published as `ghcr.io/invisco/laptop-os:{stable,stable-testing,testing}`, keyles
 
 ### Added Applications (Runtime)
 
-- **GUI Apps (Flatpak, first boot)**: 14 apps — Zen browser (casual secondary browser), Betterbird, Apostrophe, GIMP, Inkscape, LibreOffice, Okular, OnlyOffice, ProtonVPN, QPWGraph, RawTherapee, Remmina, RustDesk.
+- **GUI Apps (Flatpak, first boot)**: 12 apps — Betterbird, Apostrophe, GIMP, Inkscape, LibreOffice, Okular, OnlyOffice, ProtonVPN, QPWGraph, RawTherapee, Remmina, RustDesk.
 
 ### Removed/Disabled
 
@@ -123,7 +123,7 @@ All previous rpm-ostree layers (1Password, virt stack, cups-pdf, Epson LocalPack
    ```
 5. 1Password needs no migration (RPM→RPM, same `~/.config/1Password` path): launch, sign in, `op whoami`.
 6. Verify Brave Origin: it ships with 1Password X force-installed. The old Brave Flatpak keeps working in parallel until you migrate its profile.
-7. Print a test page on each Epson queue; `virsh list --all` (virt stack check); confirm the Zen Flatpak arrived (`flatpak list | grep -i zen`).
+7. Print a test page on each Epson queue; `virsh list --all` (virt stack check).
 8. Only after everything checks out, remove superseded Flatpaks (no `--delete-data` — data stays in `~/.var/app` and on the NAS):
    ```bash
    flatpak uninstall org.mozilla.firefox dev.zed.Zed org.mozilla.thunderbird_esr org.mozilla.Thunderbird
