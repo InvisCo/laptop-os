@@ -12,7 +12,7 @@
 set-dock-layout:
     #!/usr/bin/env bash
     set -euo pipefail
-    FAVORITES="['app.zen_browser.zen.desktop', 'librewolf.desktop', 'brave-origin.desktop', 'org.gnome.Nautilus.desktop', 'eu.betterbird.Betterbird.desktop', 'org.gnome.Ptyxis.desktop', 'org.gnome.gitlab.cheywood.Buffer.desktop']"
+    FAVORITES="['librewolf.desktop', 'brave-origin.desktop', 'org.gnome.Nautilus.desktop', 'eu.betterbird.Betterbird.desktop', 'org.gnome.Ptyxis.desktop', 'org.gnome.gitlab.cheywood.Buffer.desktop']"
     gsettings set org.gnome.shell favorite-apps "$FAVORITES"
     echo "Dock layout applied. Missing IDs vanish silently — verify with:"
     echo "  gsettings get org.gnome.shell favorite-apps"
@@ -53,7 +53,7 @@ migrate-from-bluefin yes="0":
     echo "::group:: Flatpaks"
     if confirm "Top up Flatpaks from preinstall list?"; then
         flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
-        for app in app.zen_browser.zen eu.betterbird.Betterbird org.gimp.GIMP org.inkscape.Inkscape org.libreoffice.LibreOffice org.kde.okular org.onlyoffice.desktopeditors com.protonvpn.www org.rncbc.qpwgraph com.rawtherapee.RawTherapee org.remmina.Remmina com.rustdesk.RustDesk; do
+        for app in eu.betterbird.Betterbird org.gimp.GIMP org.inkscape.Inkscape org.libreoffice.LibreOffice org.kde.okular org.onlyoffice.desktopeditors com.protonvpn.www org.rncbc.qpwgraph com.rawtherapee.RawTherapee org.remmina.Remmina com.rustdesk.RustDesk; do
             if flatpak list --app --columns=application 2>/dev/null | grep -qx "$app"; then
                 echo "  $app already installed, skipping."
             else
@@ -108,7 +108,7 @@ migrate-from-bluefin yes="0":
     echo "  1. Sign in to 1Password (app + browser extension pre-wired)."
     echo "  2. Enable Settings → Browser → 'Integrate with 1Password in your browser' (LibreWolf trust is baked in)."
     echo "  3. op signin, enable SSH agent if used."
-    echo "  4. virsh list --all (virt check); flatpak list | grep -i zen (Zen check)."
+    echo "  4. virsh list --all (virt check)."
     echo "::endgroup::"
 
     mkdir -p "$(dirname "$MARKER")"

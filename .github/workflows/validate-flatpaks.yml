@@ -16,7 +16,21 @@ jobs:
       - name: Set up Flathub
         shell: bash
         run: |
-          sudo apt install -y flatpak
+          # GitHub's apt mirror intermittently 404s freshly-published debs
+          # (e.g. xdg-desktop-portal); it self-heals within minutes, so
+          # refresh the index and retry the install rather than touching
+          # sources (mirror+file: URIs need /etc/apt/apt-mirrors.txt).
+          sudo apt-get update
+          installed=0
+          for attempt in 1 2 3 4 5; do
+            if sudo apt-get install -y flatpak; then
+              installed=1
+              break
+            fi
+            echo "apt install attempt $attempt failed; mirror may be mid-sync, retrying in 15s"
+            sleep 15
+          done
+          [ "$installed" -eq 1 ] || { echo "flatpak install kept failing after 5 attempts"; exit 1; }
           flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
 
       - name: Validate Flatpaks

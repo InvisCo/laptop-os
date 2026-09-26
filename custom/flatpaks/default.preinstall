@@ -1,9 +1,6 @@
 # laptop-os Flatpak preinstall
 # These will be installed on first boot via flatpak-preinstall.service
 
-[Flatpak Preinstall app.zen_browser.zen]
-Branch=stable
-
 [Flatpak Preinstall org.gnome.gitlab.somas.Apostrophe]
 Branch=stable
 
