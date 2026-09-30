@@ -13,10 +13,15 @@ on:
   push:
     branches:
       - stable
-  # Safety net: GitHub push events on `stable` have blacked out before
-  # (Aug 30 - Sep 14 2026); the cron keeps hotfix sync moving regardless.
+  # Safety net, and not just for this workflow: GitHub push events on `stable`
+  # blacked out entirely for two weeks here (Aug 30 - Sep 14 2026). Under the
+  # candidate-digest release model, a dropped push to `stable` means
+  # execute-release.yml never promotes the candidate, so `:stable` silently
+  # goes stale. The cron is the only thing that recovers from that. Dispatch it
+  # to force a sync after repairing the branch model by hand.
   schedule:
     - cron: "5 */6 * * *"
+  workflow_dispatch:
 
 permissions:
   contents: write

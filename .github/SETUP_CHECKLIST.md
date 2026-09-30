@@ -22,11 +22,13 @@
 
 ### 3. Configure Testing and Production Branches
 
-This template uses a **two-branch model**: `main` publishes `:stable-testing`
-candidate images, and `stable` publishes `:stable` production images.
-Promotion is a squash PR from `main` to `stable` opened automatically by
-`.github/workflows/promote-main-to-stable.yml` (factory reusable workflow —
-no external GitHub App required).
+This template uses a **two-branch model**: `main` builds the candidate and
+publishes `:stable-testing` and `:testing`; `stable` receives **no builds**.
+Pushing to `stable` runs `.github/workflows/execute-release.yml`, which verifies
+the `:testing` candidate's cosign signature and copies that exact digest to
+`:stable`. Promotion is a squash PR from `main` to `stable` opened
+automatically by `.github/workflows/promote-main-to-stable.yml` (factory
+reusable workflow — no external GitHub App required).
 
 Create `stable` as an exact copy of `main`, then return to `main`:
 
@@ -41,18 +43,24 @@ git switch main
 - [ ] Keyless signing is enabled by default; after the first build, verify it
       (see "Verify Image Signing" below) so the promotion release gate can
       check signatures and report `release/ready`
+- [ ] Set `request_reviewer: true` and a `reviewer:` slug in
+      `promote-main-to-stable.yml` **only** if your repo lives in an org with a
+      maintainers team. It ships as `false` so personal-account forks work
+      without one.
+- [ ] Merge the promotion PR from the UI, as a human. A merge performed as
+      `github-actions` creates no workflow runs, so `execute-release.yml` never
+      fires and the release degrades to a manual dispatch.
 
 Promotion PR requirements:
 
-- The promote workflow requests review from `<owner>/maintainers` when it
-  creates the PR — your repo must live in an org with that team, or replace
-  `promote-main-to-stable.yml` with a local workflow that skips reviewer
-  requests (the reviewer is set inside the shared `projectbluefin/actions`
-  reusable, so editing only your caller file won't change it)
 - Set `stable`'s required approvals to choose your automation level: `0` =
   fully automatic promotion, `1` = a maintainer approves, then auto-merge
 - The release gate is advisory by default; add the promote workflow as a
   required check on `stable` if a `release/blocked` result should block merges
+- Squash is **required**. `execute-release.yml` identifies a promotion by the
+  pushed commit's subject (`chore: promote ...`), and a fast-forward merge
+  lands no new commit on `stable`, so the release is refused as a
+  non-promotion push.
 
 ### 4. First Push
 
