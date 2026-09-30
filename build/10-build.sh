@@ -30,8 +30,18 @@ mkdir -p /usr/share/ublue-os/homebrew/
 cp /ctx/custom/brew/*.Brewfile /usr/share/ublue-os/homebrew/
 
 # Consolidate Just Files
+# Walk the tree and sort the inputs so a fork can organise recipes into
+# subdirectories and the merged result is deterministic and idempotent. An
+# unsorted concatenation makes the image layer differ between two builds of the
+# same tree, so the build is not reproducible and a bisect cannot find a
+# difference that is actually only a reordering.
 mkdir -p /usr/share/ublue-os/just/
-find /ctx/custom/ujust -iname '*.just' -exec printf "\n\n" \; -exec cat {} \; >>/usr/share/ublue-os/just/60-custom.just
+: >/usr/share/ublue-os/just/60-custom.just
+mapfile -t recipes < <(find /ctx/custom/ujust -type f -iname '*.just' | LC_ALL=C sort)
+for recipe in "${recipes[@]}"; do
+	cat "${recipe}" >>/usr/share/ublue-os/just/60-custom.just
+	printf '\n' >>/usr/share/ublue-os/just/60-custom.just
+done
 
 # Copy Flatpak preinstall files
 mkdir -p /usr/share/flatpak/preinstall.d/

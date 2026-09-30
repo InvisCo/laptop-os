@@ -13,11 +13,44 @@ set -euo pipefail
 #   IMAGE_PRETTY_NAME   - Human-readable name (e.g. Laptop OS) for GRUB/PRETTY_NAME
 #   IMAGE_VENDOR        - Image vendor/owner (e.g. github username or org)
 #   UBLUE_IMAGE_TAG     - Image tag/stream (e.g. stable, testing, latest)
-#   BASE_IMAGE_NAME     - Base image name (e.g. silverblue)
-#   FEDORA_MAJOR_VERSION - Fedora version (e.g. 42)
+#   BASE_IMAGE_NAME     - Base image name (e.g. bluefin). Supplied by `just build`,
+#                         derived from the Containerfile's base FROM line
+#   FEDORA_MAJOR_VERSION - Fedora version (e.g. 44). Declared in the
+#                         Containerfile and verified against the base image's
+#                         own /usr/lib/os-release below
 #   VERSION             - Full version string (e.g. stable-42.20250531)
 #   SHA_HEAD_SHORT      - Short git SHA (optional, for dev builds)
 ###############################################################################
+
+# The Containerfile is the source of truth for IMAGE_NAME, IMAGE_VENDOR and
+# UBLUE_IMAGE_TAG. BASE_IMAGE_NAME describes the base image, whose FROM line is
+# its source of truth; `just build` derives it from there and passes it in.
+: "${IMAGE_NAME:?IMAGE_NAME must be set}"
+: "${IMAGE_VENDOR:?IMAGE_VENDOR must be set}"
+: "${UBLUE_IMAGE_TAG:?UBLUE_IMAGE_TAG must be set}"
+: "${BASE_IMAGE_NAME:?BASE_IMAGE_NAME must be set}"
+
+# Paths. ROOT_DIR is a test seam: it is empty in the Containerfile build, where
+# these resolve to the image root, and set to a scratch tree by the BATS suite.
+ROOT_DIR="${ROOT_DIR:-}"
+IMAGE_INFO="${ROOT_DIR}/usr/share/ublue-os/image-info.json"
+OS_RELEASE="${ROOT_DIR}/usr/lib/os-release"
+
+# The base image owns the Fedora major, but its tag cannot supply one here: this
+# image is based on a Bluefin tag, whose version is Bluefin's build number
+# rather than Fedora's major. So the Containerfile declares
+# FEDORA_MAJOR_VERSION and `just build` passes it through. Verify it against the
+# base image we actually built on: a stale literal would otherwise ship an image
+# that misidentifies its own platform to every consumer of image-info.json.
+# VERSION_ID is never rewritten below, so a repeat run agrees.
+if [[ -r "${OS_RELEASE}" ]]; then
+	base_fedora_major="$(sed -n 's/^VERSION_ID="\{0,1\}\([^"]*\)"\{0,1\}$/\1/p' "${OS_RELEASE}")"
+	if [[ -n "${base_fedora_major}" && "${base_fedora_major}" != "${FEDORA_MAJOR_VERSION:-}" ]]; then
+		echo "ERROR: Containerfile declares FEDORA_MAJOR_VERSION=${FEDORA_MAJOR_VERSION} but the base image is Fedora ${base_fedora_major}" >&2
+		echo "       Update the ARG; the base image changed under a literal." >&2
+		exit 1
+	fi
+fi
 
 # Branding — customize these for your image
 IMAGE_PRETTY_NAME="${IMAGE_PRETTY_NAME:-Laptop OS}"
@@ -26,10 +59,6 @@ HOME_URL="${HOME_URL:-https://github.com/${IMAGE_VENDOR}/${IMAGE_NAME}}"
 DOCUMENTATION_URL="${DOCUMENTATION_URL:-https://github.com/${IMAGE_VENDOR}/${IMAGE_NAME}/blob/main/README.md}"
 SUPPORT_URL="${SUPPORT_URL:-https://github.com/${IMAGE_VENDOR}/${IMAGE_NAME}/issues}"
 BUG_REPORT_URL="${BUG_REPORT_URL:-https://github.com/${IMAGE_VENDOR}/${IMAGE_NAME}/issues/new}"
-
-# Paths
-IMAGE_INFO="/usr/share/ublue-os/image-info.json"
-OS_RELEASE="/usr/lib/os-release"
 
 # Derive image flavor from name
 if [[ "${IMAGE_NAME}" =~ nvidia ]]; then
