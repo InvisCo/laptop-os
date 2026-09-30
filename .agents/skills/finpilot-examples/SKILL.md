@@ -102,6 +102,12 @@ cp build/20-onepassword.sh.example build/20-onepassword.sh
 - Installs the COSMIC desktop environment from COPR
 - Sets the default graphical target
 
+**Note:** Fedora 44 now ships COSMIC in the official repos, so the COPR is
+optional. `dnf5 install -y @cosmic-desktop` is enough: `cosmic-session` pulls
+`cosmic-greeter` (which needs `greetd`) and `xdg-desktop-portal-cosmic`, and
+`systemctl enable cosmic-greeter` makes it the display manager. See
+`build/50-cosmic-desktop.sh` for a working full-replace example.
+
 **How to activate:**
 
 ```bash

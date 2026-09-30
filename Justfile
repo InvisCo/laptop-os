@@ -394,26 +394,63 @@ spawn-vm rebuild="0" type="qcow2" ram="6G":
       --vsock=false --pass-ssh-key=false \
       -i ./output/**/*.{{ type }}
 
-# Runs shell check on all Bash scripts
+# The repository's shell scripts: the *.sh files git tracks. Single definition
+# of the lint and format scope, and of the glob CI hands to validate-pr.
+[private]
+shell-sources:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    git ls-files '*.sh'
+
+# Validate Brewfiles without evaluating them as Ruby.
+[group('Just')]
+validate-brewfiles:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    bash build/validate-brewfiles.sh
+
+# Validate flatpak preinstall files against flathub (Branch= key + app existence)
+[group('Just')]
+validate-flatpaks:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    bash build/validate-flatpaks.sh
+
+# Runs shell check on the shell scripts git tracks
 lint:
     #!/usr/bin/env bash
-    set -eoux pipefail
+    set -euo pipefail
     # Check if shellcheck is installed
     if ! command -v shellcheck &> /dev/null; then
         echo "shellcheck could not be found. Please install it."
         exit 1
     fi
-    # Run shellcheck on all Bash scripts
-    /usr/bin/find . -iname "*.sh" -type f -exec shellcheck "{}" ';'
+    # git is the single source of truth for lint scope; CI resolves the same
+    # list into validate-pr's shellcheck-glob input.
+    mapfile -t sources < <(just shell-sources)
+    if [[ ${#sources[@]} -eq 0 ]]; then
+        echo "No shell scripts found: git tracks no *.sh files" >&2
+        exit 1
+    fi
+    printf 'Shellchecking %s scripts:\n' "${#sources[@]}"
+    printf '  %s\n' "${sources[@]}"
+    shellcheck "${sources[@]}"
 
-# Runs shfmt on all Bash scripts
+# Runs shfmt on the shell scripts git tracks
 format:
     #!/usr/bin/env bash
-    set -eoux pipefail
+    set -euo pipefail
     # Check if shfmt is installed
     if ! command -v shfmt &> /dev/null; then
         echo "shfmt could not be found. Please install it."
         exit 1
     fi
-    # Run shfmt on all Bash scripts
-    /usr/bin/find . -iname "*.sh" -type f -exec shfmt --write "{}" ';'
+    # Format exactly the files lint checks.
+    mapfile -t sources < <(just shell-sources)
+    if [[ ${#sources[@]} -eq 0 ]]; then
+        echo "No shell scripts found: git tracks no *.sh files" >&2
+        exit 1
+    fi
+    printf 'Formatting %s scripts:\n' "${#sources[@]}"
+    printf '  %s\n' "${sources[@]}"
+    shfmt --write "${sources[@]}"
