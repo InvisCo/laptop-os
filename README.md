@@ -96,6 +96,19 @@ cosign verify \
   ghcr.io/invisco/laptop-os:stable
 ```
 
+Note what this is and is not. The signature exists and this command checks it,
+but **the installed image does not verify it on update**: the update transport
+in `image-info.json` is `ostree-unverified-image:`, and that is deliberate.
+A `ostree-image-signed:` transport would first consult
+`/etc/containers/policy.json`, whose sigstore scopes cover only
+`ghcr.io/ublue-os` and `quay.io/toolbx-images` — this image's namespace falls
+through to the `""` catch-all (`insecureAcceptAnything`), so it would report
+success without checking anything. Signing a scope for it does not help either:
+the image is signed keyless, and containers/image matches a Fulcio certificate
+on `subjectEmail` alone, which a GitHub Actions certificate has no value for.
+Enforcing this on device would need key-based signing. Verify it at deploy time,
+as above, and treat the running image as trusted-by-acquisition.
+
 ### 3. Switch
 
 ```bash

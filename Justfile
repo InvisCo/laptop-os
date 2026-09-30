@@ -495,6 +495,45 @@ spawn-vm rebuild="0" type="qcow2" ram="6G":
       --vsock=false --pass-ssh-key=false \
       -i "$(realpath "${artifact}")"
 
+# Run the contract suite: interfaces the image must satisfy. A fork keeps these.
+[group('Just')]
+test-contract:
+    #!/usr/bin/bash
+    set -euo pipefail
+    just _bats tests/contract
+
+# Run the template suite: this repository's build wiring. A fork may delete this.
+[group('Just')]
+test-template:
+    #!/usr/bin/bash
+    set -euo pipefail
+    just _bats tests/template
+
+# Run every unit test (contract + template). CI calls this.
+[group('Just')]
+test-unit:
+    #!/usr/bin/bash
+    set -euo pipefail
+    just _bats tests
+
+# Single definition of how the suite runs: discover every *_test.bats under the
+# given directory, so a fork can add or remove files without editing this file.
+[private]
+_bats $dir:
+    #!/usr/bin/bash
+    set -euo pipefail
+    if ! command -v bats &>/dev/null; then
+        echo "bats not found — install with: sudo apt-get install bats  OR  npm install -g bats"
+        exit 1
+    fi
+    mapfile -t files < <(find "{{ dir }}" -type f -name '*_test.bats' | LC_ALL=C sort)
+    if [[ ${#files[@]} -eq 0 ]]; then
+        echo "No *_test.bats files found under {{ dir }}" >&2
+        exit 1
+    fi
+    echo "Running ${#files[@]} test files..."
+    bats --print-output-on-failure "${files[@]}"
+
 # The repository's shell scripts: the *.sh files git tracks. Single definition
 # of the lint and format scope, and of the glob CI hands to validate-pr.
 [private]

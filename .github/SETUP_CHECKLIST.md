@@ -84,7 +84,7 @@ git push origin main
   - Set **Branch name pattern** to `main`
   - Enable "Require a pull request before merging"
   - Enable "Require status checks to pass before merging"
-  - Add `validate` as a required status check
+  - Add `validate` and `BATS unit tests` as required status checks
   - Enable "Require branches to be up to date before merging"
 - [ ] Configure branch protection for `stable`: require a pull request before
       merging so only promotion PRs land there
