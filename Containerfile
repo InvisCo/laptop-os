@@ -76,7 +76,16 @@ ARG IMAGE_NAME="laptop-os"
 ARG IMAGE_VENDOR="projectbluefin"
 ARG IMAGE_PRETTY_NAME="Laptop OS"
 ARG UBLUE_IMAGE_TAG="stable"
-ARG BASE_IMAGE_NAME="silverblue"
+# BASE_IMAGE_NAME is not declared here: `just build` derives it from the base
+# FROM line above, so swapping the base image cannot leave image-info.json
+# naming the old one. It used to be pinned to "silverblue" while the base was
+# Bluefin, and nothing read the FROM line to notice.
+#
+# FEDORA_MAJOR_VERSION is declared because the base tag cannot supply it. The
+# base is pinned to a Bluefin tag, whose version is Bluefin's build number, not
+# Fedora's major. 00-image-info.sh verifies this value against the base image's
+# own /usr/lib/os-release and fails the build on a mismatch, so a Fedora major
+# bump cannot leave the identity claiming the old one.
 ARG FEDORA_MAJOR_VERSION="44"
 ARG VERSION=""
 

@@ -92,13 +92,54 @@ sudoif command *args:
 build $target_image=IMAGE_NAME $tag=DEFAULT_TAG:
     #!/usr/bin/env bash
 
-    # Read the Fedora major version from Containerfile (single source of truth).
-    # The base image itself is pinned in the Containerfile FROM line.
+    # The base image is the source of truth for both the version tag component
+    # and the base image name: it is the FROM line with no stage alias, because
+    # every context stage is `FROM ... AS name`. Renovate is what moves its tag,
+    # so a bump needs no second edit.
+    base_from=$(grep -iE '^FROM[[:space:]]' Containerfile | grep -viE '[[:space:]]as[[:space:]]' | head -n1)
+    # This Containerfile declares its base as `FROM ${BASE_IMAGE}`, so the FROM
+    # line names an ARG rather than a reference. Resolve one level of indirection
+    # from the ARG's own definition; fail loudly rather than deriving an identity
+    # from the literal string "${BASE_IMAGE}".
+    if [[ "${base_from}" =~ ^FROM[[:space:]]+\$\{([A-Za-z_][A-Za-z0-9_]*)\}[[:space:]]*$ ]]; then
+        arg_name="${BASH_REMATCH[1]}"
+        arg_value=$(grep -E "^ARG[[:space:]]+${arg_name}=" Containerfile | head -n1 | sed -E "s|^ARG[[:space:]]+${arg_name}=[\"']?([^\"']*)[\"']?$|\\1|")
+        if [[ -z "${arg_value}" ]]; then
+            echo "ERROR: Containerfile FROM line references \${${arg_name}} but no ARG ${arg_name} is defined"
+            exit 1
+        fi
+        base_from="FROM ${arg_value}"
+    fi
+    base_tag=$(sed -E 's|^FROM[[:space:]]+[^@:[:space:]]*:([^@[:space:]]+)(@.*)?$|\1|' <<<"${base_from}")
+    base_ref=$(sed -E 's|^FROM[[:space:]]+||; s|@.*$||; s|:[^:/]*$||' <<<"${base_from}")
+    base_image_name="${base_ref##*/}"
+    if [[ -z "${base_from}" || "${base_tag}" == "${base_from}" || -z "${base_image_name}" || "${base_image_name}" == '${'* ]]; then
+        echo "ERROR: Could not read the base image from the Containerfile base FROM line (got: ${base_from})"
+        exit 1
+    fi
+
+    # The version string needs a Fedora major, and the base FROM line does not
+    # carry one: this image is based on a Bluefin tag, whose version is
+    # Bluefin's build number, not Fedora's major. So the Containerfile declares
+    # it, and the build verifies the claim against the base image's own
+    # /usr/lib/os-release rather than trusting a literal.
     fedora_version=$(grep -E '^ARG FEDORA_MAJOR_VERSION=' Containerfile | head -n1 | sed -E 's/^ARG FEDORA_MAJOR_VERSION="?([^"]+)"?/\1/')
     if [[ -z "${fedora_version:-}" ]]; then
         echo "ERROR: Could not extract FEDORA_MAJOR_VERSION from Containerfile"
         exit 1
     fi
+
+    # Image identity, resolved once: an explicit IMAGE_VENDOR wins, otherwise
+    # fall back to the repository owner GitHub Actions supplies.
+    image_vendor="${IMAGE_VENDOR:-${REPO_ORG}}"
+
+    # target_image names the local image, and the VM recipes pass it with a
+    # `localhost/` prefix. The identity must not carry that prefix:
+    # image-info.json composes image-ref from IMAGE_NAME, the ISO path hands
+    # that ref to bootc-image-builder as the install target, and the OCI labels
+    # below become the image's public URLs — so the prefix would end up in a
+    # registry path that cannot exist.
+    image_name="${target_image#localhost/}"
 
     # Bluefin-style version string: <fedora-version>.<date> for stable,
     # <tag>-<fedora-version>.<date> for everything else.
@@ -110,7 +151,7 @@ build $target_image=IMAGE_NAME $tag=DEFAULT_TAG:
 
     # Avoid tag collisions when rebuilding on the same day
     if command -v skopeo &>/dev/null; then
-        skopeo list-tags "docker://ghcr.io/${IMAGE_VENDOR:-${REPO_ORG}}/${target_image}" >/tmp/repotags.json 2>/dev/null \
+        skopeo list-tags "docker://ghcr.io/${image_vendor}/${image_name}" >"${repotags}" 2>/dev/null \
             || echo '{"Tags":[]}' >/tmp/repotags.json
         if [[ $(jq "any(.Tags[]; contains(\"${ver}\"))" /tmp/repotags.json) == "true" ]]; then
             POINT=1
@@ -129,11 +170,15 @@ build $target_image=IMAGE_NAME $tag=DEFAULT_TAG:
     fi
 
     # Image identity ARGs - these define how bootc/ublue ecosystem recognizes the image
-    # Override via env vars: IMAGE_NAME, IMAGE_VENDOR, UBLUE_IMAGE_TAG
-    BUILD_ARGS+=("--build-arg" "IMAGE_NAME=${IMAGE_NAME:-${target_image}}")
-    BUILD_ARGS+=("--build-arg" "IMAGE_VENDOR=${IMAGE_VENDOR:-${REPO_ORG}}")
+    # Override via env vars: IMAGE_NAME, IMAGE_VENDOR, UBLUE_IMAGE_TAG. The base
+    # image name is not an env var: it is derived from the FROM line above, so
+    # changing the base image cannot leave the identity naming the old one.
+    BUILD_ARGS+=("--build-arg" "IMAGE_NAME=${image_name}")
+    BUILD_ARGS+=("--build-arg" "IMAGE_VENDOR=${image_vendor}")
     BUILD_ARGS+=("--build-arg" "IMAGE_PRETTY_NAME=${IMAGE_PRETTY_NAME:-Laptop OS}")
     BUILD_ARGS+=("--build-arg" "UBLUE_IMAGE_TAG=${UBLUE_IMAGE_TAG:-${tag}}")
+    BUILD_ARGS+=("--build-arg" "BASE_IMAGE_NAME=${base_image_name}")
+    BUILD_ARGS+=("--build-arg" "FEDORA_MAJOR_VERSION=${fedora_version}")
 
     # Add GitHub token as build secret if available (for CI/CD)
     if [[ -n "${GITHUB_TOKEN:-}" ]]; then
@@ -142,15 +187,17 @@ build $target_image=IMAGE_NAME $tag=DEFAULT_TAG:
     fi
 
     # Labels for ArtifactHub and OCI metadata
+    # image_name/image_vendor, not target_image: see the note where they are
+    # derived. These labels are the image's public identity.
     LABELS=()
-    LABELS+=("--label" "org.opencontainers.image.title=${target_image}")
+    LABELS+=("--label" "org.opencontainers.image.title=${image_name}")
     LABELS+=("--label" "org.opencontainers.image.version=${ver}")
     LABELS+=("--label" "org.opencontainers.image.description=${IMAGE_DESC:-My Customized Universal Blue Image}")
-    LABELS+=("--label" "org.opencontainers.image.source=https://github.com/${GITHUB_REPOSITORY_OWNER:-}/${target_image}/blob/${GITHUB_SHA:-}/Containerfile")
-    LABELS+=("--label" "org.opencontainers.image.url=https://github.com/${GITHUB_REPOSITORY_OWNER:-}/${target_image}")
-    LABELS+=("--label" "org.opencontainers.image.vendor=${IMAGE_VENDOR:-${REPO_ORG}}")
+    LABELS+=("--label" "org.opencontainers.image.source=https://github.com/${image_vendor}/${image_name}/blob/${GITHUB_SHA:-}/Containerfile")
+    LABELS+=("--label" "org.opencontainers.image.url=https://github.com/${image_vendor}/${image_name}")
+    LABELS+=("--label" "org.opencontainers.image.vendor=${image_vendor}")
     LABELS+=("--label" "org.opencontainers.image.created=$(date -u +%Y\-%m\-%d\T%H\:%M\:%S\Z)")
-    LABELS+=("--label" "io.artifacthub.package.readme-url=https://raw.githubusercontent.com/${GITHUB_REPOSITORY_OWNER:-}/${target_image}/refs/heads/main/README.md")
+    LABELS+=("--label" "io.artifacthub.package.readme-url=https://raw.githubusercontent.com/${image_vendor}/${image_name}/refs/heads/main/README.md")
     LABELS+=("--label" "io.artifacthub.package.logo-url=${IMAGE_LOGO_URL:-https://avatars.githubusercontent.com/u/120078124?s=200&v=4}")
     LABELS+=("--label" "io.artifacthub.package.keywords=${IMAGE_KEYWORDS:-bootc,ublue,universal-blue}")
     LABELS+=("--label" "io.artifacthub.package.license=Apache-2.0")
@@ -161,7 +208,7 @@ build $target_image=IMAGE_NAME $tag=DEFAULT_TAG:
     # Cache write (REGISTRY_CACHE_WRITE=1) is set by CI for non-PR builds only
     # PR builds and local builds are read-only to prevent cache poisoning
     CACHE_ARGS=()
-    cache_ref="ghcr.io/${IMAGE_VENDOR:-${REPO_ORG}}/${target_image}"
+    cache_ref="ghcr.io/${image_vendor}/${image_name}"
     if skopeo list-tags "docker://${cache_ref}" >/dev/null 2>&1; then
         CACHE_ARGS+=("--cache-from" "${cache_ref}")
         if [[ "${REGISTRY_CACHE_WRITE:-0}" == "1" ]]; then
@@ -267,7 +314,24 @@ _build-bib $target_image $tag $type $config: (_rootful_load_image target_image t
     args+="--use-librepo=True "
     args+="--rootfs=btrfs"
 
+    # Bootc Image Builder records the post-install `bootc switch` origin from
+    # the image reference it is given, so an ISO has to be built against the
+    # published reference rather than the local build tag. The image names
+    # itself in image-info.json, which keeps one source of truth and means
+    # iso/iso.toml carries no image reference at all.
+    build_image="${target_image}:${tag}"
+    if [[ "${type}" == "iso" ]]; then
+        image_info=$(just sudoif podman run --rm --entrypoint /usr/bin/cat \
+            "${target_image}:${tag}" /usr/share/ublue-os/image-info.json)
+        image_ref=$(jq -r '."image-ref"' <<<"${image_info}" | sed 's|.*docker://||')
+        build_image="${image_ref}:$(jq -r '."image-tag"' <<<"${image_info}")"
+        just sudoif podman tag "${target_image}:${tag}" "${build_image}"
+    fi
+
     BUILDTMP=$(mktemp -p "${PWD}" -d -t _build-bib.XXXXXXXXXX)
+    # This script exits on the first error, so a failed build would otherwise
+    # leave the image BIB already wrote inside BUILDTMP behind in the repo root.
+    trap 'sudo rm -rf "${BUILDTMP}"' EXIT
 
     sudo podman run \
       --rm \
@@ -276,17 +340,27 @@ _build-bib $target_image $tag $type $config: (_rootful_load_image target_image t
       --pull=newer \
       --net=host \
       --security-opt label=type:unconfined_t \
-      -v $(pwd)/${config}:/config.toml:ro \
-      -v $BUILDTMP:/output \
+      -v "$(pwd)/${config}:/config.toml:ro" \
+      -v "${BUILDTMP}:/output" \
       -v /var/lib/containers/storage:/var/lib/containers/storage \
       "${bib_image}" \
       ${args} \
-      "${target_image}:${tag}"
+      "${build_image}"
 
     mkdir -p output
-    sudo mv -f $BUILDTMP/* output/
-    sudo rmdir $BUILDTMP
-    sudo chown -R $USER:$USER output/
+    # `mv` cannot replace an existing directory (`-f` only suppresses the
+    # overwrite prompt for files), so a second build of the same type would fail
+    # here and the EXIT trap would throw the finished disk away. Clear the
+    # destinations for the artifacts we are about to move in.
+    for artifact in "$BUILDTMP"/*; do
+        sudo rm -rf "output/$(basename "$artifact")"
+    done
+    sudo mv -f "$BUILDTMP"/* output/
+    sudo rmdir "$BUILDTMP"
+    # `id` rather than `$USER`: these recipes run under `set -u` from cron,
+    # containers and systemd, where the kernel never exported USER, and
+    # aborting here would throw away a completed build.
+    sudo chown -R "$(id -u):$(id -g)" output/
 
 # Podman builds the image from the Containerfile and creates a bootable image
 # Parameters:
@@ -323,15 +397,32 @@ rebuild-raw $target_image=("localhost/" + IMAGE_NAME) $tag=DEFAULT_TAG: && (_reb
 rebuild-iso $target_image=("localhost/" + IMAGE_NAME) $tag=DEFAULT_TAG: && (_rebuild-bib target_image tag "iso" "iso/iso.toml")
 
 # Run a virtual machine with the specified image type and configuration
+# The artifact Bootc Image Builder writes for a given --type, as a path from
+# the repository root. The directory is osbuild's export name, which is not
+# always the type name: raw exports as "image" while qcow2 exports as "qcow2"
+# and the ISO types export as "bootiso". Every VM recipe resolves its input
+# through here, so the two places that must agree — where BIB writes and where
+# a VM is pointed — cannot drift apart.
+[private]
+vm-artifact $type:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    case "${type}" in
+        qcow2) echo "output/qcow2/disk.qcow2" ;;
+        raw) echo "output/image/disk.raw" ;;
+        iso) echo "output/bootiso/install.iso" ;;
+        *)
+            echo "ERROR: unknown image type '${type}' (expected qcow2, raw or iso)" >&2
+            exit 1
+            ;;
+    esac
+
 _run-vm $target_image $tag $type $config:
     #!/usr/bin/bash
     set -eoux pipefail
 
-    # Determine the image file based on the type
-    image_file="output/${type}/disk.${type}"
-    if [[ $type == iso ]]; then
-        image_file="output/bootiso/install.iso"
-    fi
+    # Same definition `just build-<type>` writes to.
+    image_file="$(just vm-artifact "$type")"
 
     # Build the image if it does not exist
     if [[ ! -f "${image_file}" ]]; then
@@ -385,6 +476,16 @@ spawn-vm rebuild="0" type="qcow2" ram="6G":
 
     [ "{{ rebuild }}" -eq 1 ] && echo "Rebuilding the ISO" && just build-vm {{ rebuild }} {{ type }}
 
+    # Resolve the artifact BIB actually wrote. The previous `./output/**/*.{{ type }}`
+    # glob was a guess: it does not match raw, which BIB exports as disk.raw
+    # under an "image" directory, so `just spawn-vm type=raw` silently booted
+    # whatever else the glob happened to match.
+    artifact="$(just vm-artifact "{{ type }}")"
+    if [ ! -f "${artifact}" ]; then
+        echo "ERROR: ${artifact} does not exist. Build it first: just build-{{ type }}" >&2
+        exit 1
+    fi
+
     systemd-vmspawn \
       -M "bootc-image" \
       --console=gui \
@@ -392,7 +493,7 @@ spawn-vm rebuild="0" type="qcow2" ram="6G":
       --ram=$(echo {{ ram }}| /usr/bin/numfmt --from=iec) \
       --network-user-mode \
       --vsock=false --pass-ssh-key=false \
-      -i ./output/**/*.{{ type }}
+      -i "$(realpath "${artifact}")"
 
 # The repository's shell scripts: the *.sh files git tracks. Single definition
 # of the lint and format scope, and of the glob CI hands to validate-pr.
