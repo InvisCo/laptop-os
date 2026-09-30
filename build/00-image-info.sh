@@ -36,21 +36,31 @@ ROOT_DIR="${ROOT_DIR:-}"
 IMAGE_INFO="${ROOT_DIR}/usr/share/ublue-os/image-info.json"
 OS_RELEASE="${ROOT_DIR}/usr/lib/os-release"
 
-# The base image owns the Fedora major, but its tag cannot supply one here: this
-# image is based on a Bluefin tag, whose version is Bluefin's build number
-# rather than Fedora's major. So the Containerfile declares
-# FEDORA_MAJOR_VERSION and `just build` passes it through. Verify it against the
-# base image we actually built on: a stale literal would otherwise ship an image
-# that misidentifies its own platform to every consumer of image-info.json.
-# VERSION_ID is never rewritten below, so a repeat run agrees.
+# The base image's own os-release is authoritative for the Fedora major. It is
+# also the only source that cannot go stale: the Containerfile declares
+# FEDORA_MAJOR_VERSION only because this image is based on a Bluefin tag, whose
+# version is Bluefin's build number rather than Fedora's major, so the major has
+# to be written down somewhere. `just build` passes that declaration through.
+#
+# Use the base image's value when there is one, and treat a disagreement as a
+# hard error rather than silently preferring either side. Two sites that
+# disagree is the failure this whole check exists to catch: the image would
+# otherwise report a platform it was not built on, to every consumer of
+# image-info.json. VERSION_ID is never rewritten below, so a repeat run agrees.
+base_fedora_major=""
 if [[ -r "${OS_RELEASE}" ]]; then
 	base_fedora_major="$(sed -n 's/^VERSION_ID="\{0,1\}\([^"]*\)"\{0,1\}$/\1/p' "${OS_RELEASE}")"
-	if [[ -n "${base_fedora_major}" && "${base_fedora_major}" != "${FEDORA_MAJOR_VERSION:-}" ]]; then
-		echo "ERROR: Containerfile declares FEDORA_MAJOR_VERSION=${FEDORA_MAJOR_VERSION} but the base image is Fedora ${base_fedora_major}" >&2
+fi
+if [[ -n "${base_fedora_major}" ]]; then
+	if [[ -n "${FEDORA_MAJOR_VERSION:-}" && "${base_fedora_major}" != "${FEDORA_MAJOR_VERSION}" ]]; then
+		echo "ERROR: Containerfile declares FEDORA_MAJOR_VERSION=${FEDORA_MAJOR_VERSION}" >&2
+		echo "       but the base image is Fedora ${base_fedora_major}." >&2
 		echo "       Update the ARG; the base image changed under a literal." >&2
 		exit 1
 	fi
+	FEDORA_MAJOR_VERSION="${base_fedora_major}"
 fi
+: "${FEDORA_MAJOR_VERSION:?FEDORA_MAJOR_VERSION must be set or derivable from ${OS_RELEASE}}"
 
 # Branding — customize these for your image
 IMAGE_PRETTY_NAME="${IMAGE_PRETTY_NAME:-Laptop OS}"
@@ -67,22 +77,56 @@ else
 	IMAGE_FLAVOR="main"
 fi
 
-# Image ref (used by bootc for upgrade source)
-IMAGE_REF="ostree-image-signed:docker://ghcr.io/${IMAGE_VENDOR}/${IMAGE_NAME}"
+# Image ref (used by bootc for the upgrade source).
+#
+# Deliberately an *unverified* transport: nothing on an installed system can
+# check this image's signature, so claiming otherwise would be decorative.
+# `ostree-image-signed:` means "verify against /etc/containers/policy.json
+# first", and that policy arrives from Bluefin's shared overlay, whose sigstore
+# scopes cover ghcr.io/ublue-os and quay.io/toolbx-images. This namespace falls
+# through to the `""` catch-all (insecureAcceptAnything), so a signed transport
+# would report success without checking anything.
+#
+# Adding a scope would not fix it either, because the image is signed keyless:
+# the identity lives in a URI SAN
+# (https://github.com/${IMAGE_VENDOR}/${IMAGE_NAME}/.github/workflows/...), and
+# containers/image matches a Fulcio certificate on `subjectEmail` alone —
+# mandatory, exact, with an explicit FIXME for URI SANs in
+# signature/fulcio_cert.go. A GitHub Actions certificate carries no email SAN,
+# so no policy entry can match one. Device-side enforcement needs key-based
+# signing; a code-signing key in a published container image is not a
+# possibility, because pulling the image requires reading the key.
+#
+# Keeping `docker://` matters: `just _build-bib` recovers the published
+# reference from this field for the ISO, stripping everything up to it. A
+# registry-shorthand transport has no docker:// to strip and the ISO would be
+# built against a reference still carrying the transport prefix.
+IMAGE_REF="ostree-unverified-image:docker://ghcr.io/${IMAGE_VENDOR}/${IMAGE_NAME}"
 
 ###############################################################################
 # Write image-info.json
 ###############################################################################
-mkdir -p /usr/share/ublue-os
+# JSON-escape every interpolated value. These are build ARGs, so they are
+# under the repository's control, but a quote in a name or pretty-name yields a
+# file no parser accepts — and the consumers are `bootc switch`, the ujust
+# recipes and the ISO build, so the failure surfaces far from the cause.
+json_escape() {
+    local s="$1"
+    s="${s//\\/\\\\}"
+    s="${s//\"/\\\"}"
+    printf '%s' "${s}"
+}
+
+mkdir -p "$(dirname "${IMAGE_INFO}")"
 cat >"${IMAGE_INFO}" <<EOF
 {
-  "image-name": "${IMAGE_NAME}",
-  "image-flavor": "${IMAGE_FLAVOR}",
-  "image-vendor": "${IMAGE_VENDOR}",
-  "image-ref": "${IMAGE_REF}",
-  "image-tag": "${UBLUE_IMAGE_TAG}",
-  "base-image-name": "${BASE_IMAGE_NAME}",
-  "fedora-version": "${FEDORA_MAJOR_VERSION}"
+  "image-name": "$(json_escape "${IMAGE_NAME}")",
+  "image-flavor": "$(json_escape "${IMAGE_FLAVOR}")",
+  "image-vendor": "$(json_escape "${IMAGE_VENDOR}")",
+  "image-ref": "$(json_escape "${IMAGE_REF}")",
+  "image-tag": "$(json_escape "${UBLUE_IMAGE_TAG}")",
+  "base-image-name": "$(json_escape "${BASE_IMAGE_NAME}")",
+  "fedora-version": "$(json_escape "${FEDORA_MAJOR_VERSION}")"
 }
 EOF
 
@@ -108,13 +152,25 @@ if [[ -f "${OS_RELEASE}" ]]; then
 		OS_VERSION="${UBLUE_IMAGE_TAG}"
 	fi
 
+	# Replace via awk, not sed: the value is user-facing text (a URL with a
+	# query string, a version with a dot) and `&`, `\` and the delimiter are
+	# metacharacters in a sed replacement. awk treats the value as data.
+	#
+	# Appending is not an option on its own: the first occurrence of a key wins
+	# in os-release, so a duplicate would leave the base image's value in
+	# effect. The existing line is removed first.
 	set_key() {
-		local key="$1" value="$2"
-		if grep -q "^${key}=" "${OS_RELEASE}"; then
-			sed -i "s|^${key}=.*|${key}=\"${value}\"|" "${OS_RELEASE}"
-		else
-			echo "${key}=\"${value}\"" >>"${OS_RELEASE}"
+		local key="$1" value="$2" tmp
+		tmp="$(mktemp)"
+		awk -v k="${key}" -v v="${value}" '
+			$0 ~ "^" k "=" { print k "=\"" v "\""; next }
+			{ print }
+		' "${OS_RELEASE}" >"${tmp}"
+		if ! grep -q "^${key}=" "${OS_RELEASE}"; then
+			printf '%s="%s"\n' "${key}" "${value}" >>"${tmp}"
 		fi
+		cat "${tmp}" >"${OS_RELEASE}"
+		rm -f "${tmp}"
 	}
 
 	set_key "NAME" "${IMAGE_NAME}"

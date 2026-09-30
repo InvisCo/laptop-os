@@ -88,42 +88,60 @@ just --list
 
 | Check                            | Command                                  |
 | -------------------------------- | ---------------------------------------- |
-| Shellcheck (if scripts modified) | `shellcheck build/*.sh`                  |
+| Shellcheck (if scripts modified) | `just lint` (git-scoped `*.sh`)          |
 | Hadolint                         | `hadolint Containerfile` (or rely on CI) |
-| Justfile syntax                  | `just --list`                            |
+| Justfile syntax                  | `just --list`, `just check`              |
+| Unit tests                       | `just test-unit`                         |
 | Local build test                 | `just build`                             |
 
-**CI triggers:** `pr-validation.yml` (shellcheck, hadolint)
+**CI triggers:** `pr-validation.yml` (shellcheck, hadolint), `unit-tests.yml`
 
 ### `build/*.sh` Changes
 
 | Check                         | Command                                                                     |
 | ----------------------------- | --------------------------------------------------------------------------- |
-| Shellcheck all modified `.sh` | `shellcheck build/10-build.sh` (or specific file)                           |
+| Shellcheck all modified `.sh` | `just lint`                                                                 |
 | Local build test              | `just build`                                                                |
-| bootc lint                    | `just lint` (or run `bootc container lint --fatal-warnings` in built image) |
+| bootc lint                    | `bootc container lint --fatal-warnings` in the built image                  |
+| Unit tests                    | `just test-contract`                                                        |
 
-**CI triggers:** `pr-validation.yml` (shellcheck)
+`just lint` and CI resolve the same list — `git ls-files '*.sh'` — so a script
+outside `build/` is covered by both. A hardcoded `build/*.sh` glob silently
+stops covering anything added elsewhere.
+
+**CI triggers:** `pr-validation.yml` (shellcheck), `unit-tests.yml`
 
 ### Brewfile Changes
 
-| Check                 | Command                                                 |
-| --------------------- | ------------------------------------------------------- |
-| Syntax validation     | `brew bundle check --file custom/brew/default.Brewfile` |
-| List packages         | `brew bundle list --file custom/brew/default.Brewfile`  |
-| Verify packages exist | `brew search <package-name>`                            |
+| Check                 | Command                                             |
+| --------------------- | --------------------------------------------------- |
+| Validate declarations | `just validate-brewfiles`                           |
+| List packages         | `brew bundle list --file custom/brew/default.Brewfile` |
+| Verify packages exist | covered by `just validate-brewfiles`               |
 
-**CI triggers:** `validate-brewfiles.yml`
+Never `brew bundle check` a repository Brewfile as a validation step: a Brewfile
+is a Ruby DSL, so evaluating a PR-controlled one is code execution in CI.
+`build/validate-brewfiles.sh` greps the files and passes names to `brew info` as
+data, which is the only safe form. It found `repgrep` in `default.Brewfile` on
+its first run.
+
+**CI triggers:** `validate-brewfiles.yml`, `unit-tests.yml`
 
 ### Flatpak Changes
 
 | Check                    | Command                                            |
 | ------------------------ | -------------------------------------------------- |
-| Verify app ID on Flathub | Visit `https://flathub.org/apps/<app-id>`          |
-| Syntax check             | Ensure INI format with `Branch=stable`             |
+| Validate declarations    | `just validate-flatpaks`                           |
+| Verify app ID on Flathub | covered by the above (`flatpak remote-info`)        |
+| Syntax check             | covered by the above (GKeyFile shape + `Branch=`)  |
 | No duplicate app IDs     | Search for existing app IDs in `.preinstall` files |
 
-**CI triggers:** `validate-flatpaks.yml`
+The validator also rejects lines that are not a comment, a
+`[Flatpak Preinstall <app-id>]` header or a `key=value` pair. flatpak logs those
+at `g_info` level and then discards the whole file, so malformed syntax looks
+identical to an empty preinstall list.
+
+**CI triggers:** `validate-flatpaks.yml`, `unit-tests.yml`
 
 ### ujust Changes
 
