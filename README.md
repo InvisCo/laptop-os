@@ -60,14 +60,14 @@ Two-branch model:
 | Branch | Tag | Purpose |
 |---|---|---|
 | `main` | `:stable-testing` (+`:testing`) | Testing |
-| `stable` | `:stable` | Production |
+| `stable` | `:stable` (promoted digest, never rebuilt) | Production |
 
 1. Change something locally, run `just build` to smoke-test (~10 min).
-2. Push to `main` → CI builds/pushes `:stable-testing`.
-3. `promote-main-to-stable.yml` opens a fast-forward PR `main`→`stable` (`--ff-only`, `--merge` fallback for direct hotfixes) — local workflow, the upstream reusable requires an org `maintainers` team; `publish-stable` builds `:stable` whenever the branch lags the last successful build.
-4. Merge publishes `:stable`.
+2. Push to `main` → CI builds and signs the candidate, pushing `:stable-testing` and `:testing`.
+3. `promote-main-to-stable.yml` opens a squash PR `main`→`stable` daily — a thin caller for the upstream `reusable-promote-squash.yml`, with `request_reviewer: false` because a personal account has no org `maintainers` team. Merge it **from the UI**: a merge performed as `github-actions` creates no workflow runs, so the release would never fire.
+4. `execute-release.yml` verifies the signed `:testing` candidate's cosign signature and copies that exact digest to `:stable`. Nothing rebuilds on `stable`, so the production image is byte-for-byte what was tested on `main`. A failed signature check rejects the candidate and leaves the previous `:stable` in place.
 
-Note: pushes made by `GITHUB_TOKEN` don't trigger workflows — the first-ever promotion seeded `stable` directly and needed a manual `workflow_dispatch` build on the stable branch.
+Squash is required, not cosmetic: `execute-release.yml` recognises a promotion by its commit subject, and a fast-forward merge lands no new commit on `stable`, so the release is refused.
 
 Rollback: pick the previous deployment in GRUB (system state only, `/home` untouched).
 

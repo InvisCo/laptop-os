@@ -33,14 +33,16 @@ description: >-
 
 | File                          | Trigger                           | Purpose                                                       |
 | ----------------------------- | --------------------------------- | ------------------------------------------------------------- |
-| `build-image.yml`             | push main + stable, manual        | Publish `:stable-testing` (main) or `:stable` (stable); skips pushes whose diff only touches `paths-ignore` files |
-| `promote-main-to-stable.yml`  | push main, manual                 | Open/refresh promotion PR `main` → `stable` (fast-forward, `--merge` fallback); `publish-stable` job dispatches a `stable` build when the branch lags the last built tree |
-| `sync-stable-to-main.yml`     | push stable + 6h cron             | Merge direct `stable` hotfixes back to `main` (usually no-op) |
-| `pr-validation.yml`           | PR → main                         | shellcheck + hadolint + pre-commit via `validate-pr`          |
+| `build-image.yml`             | push main, manual                 | Build the candidate and publish `:stable-testing` + `:testing`; skips pushes whose diff only touches `paths-ignore` files. `stable` never builds |
+| `execute-release.yml`         | push stable, manual               | Release gate + digest promotion: copy the signed `:testing` candidate digest to `:stable`. Refuses a push to `stable` that is not a promotion |
+| `promote-main-to-stable.yml`  | schedule 04:00, manual            | Thin caller for `reusable-promote-squash.yml`: open/refresh the squash promotion PR `main` → `stable` from `auto/promote-main-to-stable`, repair a branch whose tree drifted, unblock the bot's held checks, run the release gate |
+| `sync-stable-to-main.yml`     | push stable + 6h cron + manual    | Merge direct `stable` hotfixes back to `main` (usually no-op). The cron is the recovery path for a `stable` push blackout |
+| `pr-validation.yml`           | PR → main, stable; merge_group    | shellcheck (scope = `git ls-files '*.sh'`) + hadolint + pre-commit via `validate-pr`; fails a promotion PR whose tree does not match `main` |
+| `unit-tests.yml`              | PR + push main/stable, merge_group | `just test-unit` — BATS contract + template suites |
 | `renovate.yml`                | schedule 6h, push renovate config | Self-hosted Renovate runner                                   |
 | `clean.yml`                   | schedule weekly                   | Delete GHCR images older than 90 days                         |
-| `validate-brewfiles.yml`      | PR paths: `custom/brew/**`        | Homebrew Brewfile syntax check                                |
-| `validate-flatpaks.yml`       | PR paths: `custom/flatpaks/**`    | Flathub app ID existence check                                |
+| `validate-brewfiles.yml`      | PR paths: `custom/brew/**`        | `just validate-brewfiles` — greps Brewfiles, resolves names via `brew info` as data |
+| `validate-flatpaks.yml`       | PR paths: `custom/flatpaks/**`    | `build/validate-flatpaks.sh` — Branch= key + Flathub app existence |
 | `validate-justfiles.yml`      | PR paths: `Justfile`              | `just --list` syntax check                                    |
 | `validate-renovate.yml`       | PR paths: `.github/renovate.json` | `renovate-config-validator`                                   |
 
@@ -48,26 +50,36 @@ description: >-
 
 - `main` is the testing branch and publishes `:stable-testing` (plus bare
   `:testing`, which the promotion release gate resolves).
-- `stable` is the production branch and publishes `:stable`.
-- Promotion is a local `promote-main-to-stable.yml` (replacement for the
-  factory `reusable-promote-squash.yml`, which requires a maintainer team).
-  Promotions merge via **fast-forward** — `stable` becomes `main`'s exact
-  SHA and never gains unique commits, so promotion PRs cannot conflict
-  (squash promotions created stable-only commits and recurring
-  `Containerfile` merge conflicts). A `--merge` fallback covers direct
-  `stable` hotfixes; `sync-stable-to-main.yml`
-  (`reusable-sync-branches.yml`) pulls those back on stable push and on a
-  6-hour cron. pull[bot] / `.github/pull.yml` was rejected (issues #235/#237);
-  do not add it.
-- `build-image.yml` skips pushes whose diff only touches `paths-ignore`
-  files (e.g. `.md`, validate workflows), and GitHub push events on `stable`
-  have blacked out before (Aug 30 - Sep 14 2026). The `publish-stable` job
-  in `promote-main-to-stable.yml` dispatches a `stable` build whenever the
-  branch's tree lags the last successful `:stable` build, so the image
-  cannot silently go stale.
-- The `Determine image tag` step sets `TAG_STREAM=testing` off the production
-  branch; `Finalize branch tags` renames `testing*` tags to `stable-testing-*`
-  so they never collide with production `stable-daily*` aliases.
+- `stable` is the production branch and receives **no builds**. Pushing to it
+  runs `execute-release.yml`, which verifies the `:testing` candidate's cosign
+  signature and copies that exact digest to `:stable`. The image on `stable` is
+  byte-for-byte the one that was tested and signed on `main`.
+- Promotions merge via **squash**. This is required, not preferred:
+  `execute-release.yml` identifies a promotion by the pushed commit's subject
+  (`chore: promote ...` / `ci(promote): ...`), and a fast-forward merge lands
+  no new commit on `stable`, so the release is refused as a non-promotion
+  push. `stable` therefore gains one commit per promotion; the trees stay
+  identical, so `sync-stable-to-main.yml` (`reusable-sync-branches.yml`)
+  still no-ops.
+- `promote-main-to-stable.yml` is a thin caller for the factory
+  `reusable-promote-squash.yml` with `request_reviewer: false` (a personal
+  account has no `<owner>/maintainers` team), `use_merge_queue: false` (a
+  merge queue needs an org) and `enqueue_promotion: false` (the reusable
+  exposes no merge-method input, and `gh pr merge --auto` without a method
+  fails without a TTY). pull[bot] / `.github/pull.yml` was rejected (issues
+  #235/#237); do not add it.
+- **Merge the promotion PR as a human, from the UI.** A merge performed as
+  `github-actions` creates no workflow runs, so the push-triggered
+  `execute-release.yml` and `sync-stable-to-main.yml` never fire and the
+  release degrades to a manual dispatch.
+- GitHub push events on `stable` blacked out entirely here for two weeks
+  (Aug 30 - Sep 14 2026). Under digest promotion a dropped push means `:stable`
+  silently goes stale. Recover with `gh workflow run execute-release.yml`;
+  the 6-hour cron on `sync-stable-to-main.yml` is the standing net.
+- `build-image.yml` only runs on `main`, so `Determine image tag` always takes
+  the testing branch and `TAG_STREAM=testing` is a constant in practice;
+  `Finalize branch tags` renames `testing*` to `stable-testing-*` and keeps the
+  bare `:testing` tag the release gate resolves candidate digests from.
 - The release gate verifies cosign signatures on `:testing`; the `Sign and
   publish` step in `build-image.yml` provides them, and unsigned images report
   `release/blocked`.
