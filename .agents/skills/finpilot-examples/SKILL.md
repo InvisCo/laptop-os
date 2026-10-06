@@ -71,29 +71,6 @@ All NVIDIA logic is self-contained in the script. It provisions NVIDIA support d
 
 ---
 
-### `build/20-onepassword.sh.example`
-
-**What it does:**
-
-- Adds the 1Password repository
-- Installs `1password`
-- Removes the repo file after install (isolated install pattern)
-
-**How to activate:**
-
-```bash
-cp build/20-onepassword.sh.example build/20-onepassword.sh
-# Add the standard RUN block for /ctx/build/20-onepassword.sh after 10-build.sh.
-# See build/README.md, then customize this script if needed.
-```
-
-**Expected validation:**
-
-- `pr-validation.yml` → shellcheck
-- `build-image.yml` → full build test
-
----
-
 ### `build/30-cosmic-desktop.sh.example`
 
 **What it does:**

@@ -6,6 +6,40 @@
 ## See .agents/skills/finpilot-custom/SKILL.md for runtime layer guidance
 ## See .agents/skills/finpilot-examples/SKILL.md for activation patterns
 
+# Install the GUI casks (1Password app + CLI, Zed) and wire 1Password native
+# messaging into the native RPM browsers. Needs a terminal: cask postflight
+# uses sudo for setgid/setuid bits, polkit, groupadd, and the allowlist.
+[group('Apps')]
+install-apps:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    echo "Installing GUI applications via Homebrew casks..."
+    brew bundle --file /usr/share/ublue-os/homebrew/apps.Brewfile
+
+    # The casks write native messaging manifests and their wrapper into
+    # ~/.mozilla and ~/.config/BraveSoftware/Brave-Browser. LibreWolf and Brave
+    # Origin only scan their own directories, so mirror the files into them.
+    mirror() {
+        if [[ ! -d "$1" ]]; then
+            echo "  Skipping mirror: $1 not written by the casks."
+            return 0
+        fi
+        mkdir -p "$2"
+        cp -f "$1"/*.json "$1"/1PasswordWrapper.sh "$2"/
+        chmod 755 "$2"/1PasswordWrapper.sh
+    }
+    mirror "$HOME/.mozilla/native-messaging-hosts" "$HOME/.librewolf/native-messaging-hosts"
+    mirror "$HOME/.config/BraveSoftware/Brave-Browser/NativeMessagingHosts" \
+           "$HOME/.config/BraveSoftware/Brave-Origin/NativeMessagingHosts"
+    # ponytail: copies go stale after `brew upgrade`; re-run this recipe to refresh.
+
+    # LibreWolf is not in 1Password's shipped browser allowlist.
+    if ! grep -qxF librewolf /etc/1password/custom_allowed_browsers 2>/dev/null; then
+        printf 'librewolf\n' | sudo tee -a /etc/1password/custom_allowed_browsers >/dev/null
+    fi
+
+    echo "Restart 1Password, then enable each browser under Settings -> Integrations."
+
 # Install default applications via Homebrew
 [group('Apps')]
 install-default-apps:
@@ -32,6 +66,7 @@ install-fonts:
 install-all-brew:
     #!/usr/bin/env bash
     echo "Installing all applications from Brewfiles..."
+    ujust install-apps
     brew bundle --file /usr/share/ublue-os/homebrew/default.Brewfile
     brew bundle --file /usr/share/ublue-os/homebrew/development.Brewfile
     brew bundle --file /usr/share/ublue-os/homebrew/fonts.Brewfile

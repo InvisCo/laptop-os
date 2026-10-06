@@ -4,23 +4,24 @@ This directory contains build scripts used during image creation. The default Co
 
 ## How It Works
 
-Scripts are named with a number prefix (e.g., `10-build.sh`, `20-onepassword.sh`) and run in ascending order during the container build process.
+Scripts are named with a number prefix (e.g., `10-build.sh`, `30-browsers.sh`) and run in ascending order during the container build process. A number can be vacated — gaps are fine.
 
 ## Included Scripts
 
 - **`10-build.sh`** - Main build script for base system modifications, package installation, and service configuration
-- **`20-onepassword.sh`** - 1Password desktop app + CLI from the official AgileBits repository (needs a real `/opt`, not the base symlink)
-- **`30-browsers.sh`** - Brave Origin (adblock built in, no rewards/crypto/VPN — no de-bloat policies needed upstream) + LibreWolf, 1Password native-messaging bridge, managed policies from `overrides/`
+- **`30-browsers.sh`** - Brave Origin (adblock built in, no rewards/crypto/VPN — no de-bloat policies needed upstream) + LibreWolf, managed policies from `overrides/`
 - **`40-epson-printers.sh`** - Vendored Epson drivers from `rpms/` (legacy signatures, `--nodigest --nosignature`)
 
 ## Example Scripts
 
-- **`20-onepassword.sh.example`** - Example showing how to install software from third-party RPM repositories (Google Chrome, 1Password)
 - **`30-cosmic-desktop.sh.example`** - Example showing how to replace the GNOME desktop with COSMIC desktop
 - **`40-nvidia.sh.example`** - Example showing how to add NVIDIA drivers and CDI container support
 
+For the third-party RPM repository pattern (enable repo → `dnf5 install -y` →
+remove the repo file) read `30-browsers.sh`, which ships active.
+
 To use an example script:
-1. Rename it to remove the `.example` extension (for example, `mv build/20-onepassword.sh.example build/20-onepassword.sh`).
+1. Rename it to remove the `.example` extension (for example, `mv build/40-nvidia.sh.example build/40-nvidia.sh`).
 2. Add the standard `RUN` block below after the `10-build.sh` block in `Containerfile`, replacing `NN-example.sh` with the renamed script.
 3. Run `just build`.
 

@@ -38,6 +38,7 @@ description: >-
 | Add a dev environment tool     | `brew "pkg"`                                  | `custom/brew/development.Brewfile`   |
 | Add a font                     | `brew "font-xyz"`                             | `custom/brew/fonts.Brewfile`         |
 | Add a GUI app                  | `[Flatpak Preinstall org.app.id]`             | `custom/flatpaks/default.preinstall` |
+| Add a GUI app as a native Linux cask | `tap "ublue-os/tap", trusted: true` + `cask "x-linux"` | `custom/brew/apps.Brewfile` |
 | Add a user command             | Create shortcut (NO dnf5)                     | `custom/ujust/*.just`                |
 | Enable a systemd service       | `systemctl enable service.name`               | `build/10-build.sh`                  |
 | Replace desktop environment    | Remove old → install new → set default        | `build/30-*.sh` (see examples)       |
@@ -101,13 +102,21 @@ For Google Chrome, 1Password, VS Code, etc. Follow the example scripts.
 3. `dnf5 install -y` the package(s)
 4. **CRITICAL**: Remove the repo file at end of script
 
-See `build/20-onepassword.sh.example` for a complete working example.
+See `build/30-browsers.sh` (active) for the pattern in practice: Brave Origin
+and LibreWolf repos enabled, installed, then removed.
 
 ## Runtime Brew: `custom/brew/*.Brewfile`
 
 Homebrew is for CLI tools and development environments, installed by users
 after first boot. File locations, syntax, and validation:
 `finpilot-custom`.
+
+GUI apps can also ship as **Linux casks** from `ublue-os/tap`
+(`1password-gui-linux`, `1password-cli-linux`, `zed-linux`). Prefer a cask over
+a build-time RPM when upstream has no Fedora repo, the app floats faster than
+image releases, or its `/etc` artifacts should stay out of the image. Casks
+need `trusted: true` on the tap line and interactive sudo — see
+`finpilot-custom` for the constraints.
 
 ## Runtime Flatpak: `custom/flatpaks/*.preinstall`
 

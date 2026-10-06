@@ -45,7 +45,7 @@ migrate-from-bluefin yes="0":
     echo "::endgroup::"
 
     echo "::group:: Brew bundles"
-    if confirm "Install Brew bundles (default + dev + fonts)?"; then
+    if confirm "Install Brew bundles incl. 1Password + Zed casks (needs sudo)?"; then
         just --justfile "{{ justfile() }}" install-all-brew
     fi
     echo "::endgroup::"
@@ -105,8 +105,8 @@ migrate-from-bluefin yes="0":
     echo "::endgroup::"
 
     echo "::group:: 1Password checklist (manual)"
-    echo "  1. Sign in to 1Password (app + browser extension pre-wired)."
-    echo "  2. Enable Settings → Browser → 'Integrate with 1Password in your browser' (LibreWolf trust is baked in)."
+    echo "  1. Sign in to 1Password (app + browser extension wired by the casks + install-apps)."
+    echo "  2. Enable Settings → Browser → 'Integrate with 1Password in your browser' (LibreWolf needs the allowlist entry added above)."
     echo "  3. op signin, enable SSH agent if used."
     echo "  4. virsh list --all (virt check)."
     echo "::endgroup::"

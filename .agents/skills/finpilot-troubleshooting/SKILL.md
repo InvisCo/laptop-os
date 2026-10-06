@@ -105,6 +105,17 @@ description: >-
 | COPR conflicts on update                | Multiple COPRs enabled simultaneously                         | Ensure all COPRs are disabled after install, use isolated installs only                       |
 | `dnf5 copr list` shows unexpected repos | Old COPR not cleaned up                                       | Remove repo files from `/etc/yum.repos.d/` if not managed by `copr_install_isolated`          |
 
+## Homebrew Cask Issues
+
+| Symptom                                                       | Cause                                                            | Solution                                                                                                                                   |
+| ------------------------------------------------------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `brew bundle` refuses the tap / untrusted tap warning         | Third-party taps are untrusted by default since Homebrew 4.5     | Declare `tap "ublue-os/tap", trusted: true` in the Brewfile, or run `brew trust ublue-os/tap`                                              |
+| Cask install fails in a systemd unit / non-interactive shell | Cask `postflight_steps` need `sudo` (setuid/setgid, `groupadd`, `/etc`) | Install the cask Brewfile from a terminal (`ujust install-apps`); keep it out of `default.Brewfile`                                       |
+| Browser extension cannot reach the 1Password app              | Manifest points at a removed path, or the browser scans its own directory | Re-run `ujust install-apps`; LibreWolf needs `~/.librewolf/native-messaging-hosts`, Brave Origin needs `Brave-Origin/NativeMessagingHosts` |
+| 1Password refuses a forked browser                            | Browser binary not in `/etc/1password/custom_allowed_browsers`    | Append the binary name (`librewolf`), then restart the app                                                                                 |
+| `mv EPERM` on a native messaging manifest                    | Manifest locked with `chattr +i` by an external bridge            | Casks detect the lock and skip it; `sudo chattr -i <manifest>` to hand control back to Homebrew                                            |
+| Groups/allowlist gone after `bootc switch`                    | `onepassword*` groups and `/etc/1password` are mutable `/etc` state | Re-run `ujust install-apps` after every switch; Homebrew in `/home` survives                                                               |
+
 ## ujust Command Not Found
 
 | Symptom                                | Cause                                                           | Solution                                                                             |

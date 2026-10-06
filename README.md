@@ -11,15 +11,15 @@ Published as `ghcr.io/invisco/laptop-os:{stable,stable-testing,testing}`, keyles
 ### Added Packages (Build-time)
 
 - **System packages**: `tmux`, `gum` (template defaults), plus `cups-pdf`, `libvirt`, `qemu-kvm`, `virt-manager` (VM workflows).
-- **1Password**: desktop app + CLI (`1password`, `1password-cli`) from the official AgileBits RPM repository, so the app, CLI, and browser extensions share native messaging without any sandbox in between.
+- **1Password**: desktop app + CLI as Linux Homebrew casks (`1password-gui-linux`, `1password-cli-linux`) from `ublue-os/tap`, installed at runtime by `ujust install-apps`. Nothing 1Password-related is baked into the image.
 - **Browsers (native RPMs only — no Flatpak browsers)**:
-  - **LibreWolf** (primary) from the official signed `repo.librewolf.net` repository, with the 1Password native-messaging symlink baked in.
+  - **LibreWolf** (primary) from the official signed `repo.librewolf.net` repository.
   - **Brave Origin** from the official Brave RPM repository — adblock built in, no Rewards/Wallet/VPN/Tor; built-in password manager off via managed policy, 1Password extension force-installed.
-- **Zed editor** via the `cjatherton/zed` COPR (isolated enable, upstream-tracked releases).
 - **Epson printer drivers**: vendored RPMs (`epson-inkjet-printer-201207w`/`201215w` for L355/M105 + `epson-inkjet-printer-escpr` 1.8.8 src.rpm for L4160/L3250 via https://github.com/vmartins/epson-inkjet-printer-escpr) under `rpms/` with SHA256 checksums.
 
 ### Added Applications (Runtime)
 
+- **GUI Apps (Homebrew casks, `ujust install-apps`)**: 1Password desktop app, 1Password CLI, Zed — from `ublue-os/tap`. Requires a terminal (cask postflight uses sudo).
 - **GUI Apps (Flatpak, first boot)**: 12 apps — Betterbird, Apostrophe, GIMP, Inkscape, LibreOffice, Okular, OnlyOffice, ProtonVPN, QPWGraph, RawTherapee, Remmina, RustDesk.
 
 ### Removed/Disabled
@@ -31,24 +31,25 @@ Published as `ghcr.io/invisco/laptop-os:{stable,stable-testing,testing}`, keyles
 ### Configuration Changes
 
 - LibreWolf loosened-defaults overrides shipped to `/usr/share/laptop-os/librewolf/librewolf.overrides.cfg`; activate per user with `ujust laptop-os-librewolf-overrides`. Active prefs: DRM (EME), WebGL, search suggestions, Firefox Sync UI. GSB, RFP, canvas prompts intentionally untouched.
-- 1Password native messaging bridged into LibreWolf: `/usr/lib64/mozilla/native-messaging-hosts -> /usr/lib/librewolf/native-messaging-hosts`.
+- 1Password native messaging is wired at runtime by `ujust install-apps`: the casks generate manifests in `~/.mozilla/native-messaging-hosts` and `~/.config/BraveSoftware/Brave-Browser/NativeMessagingHosts`, and the recipe mirrors them into `~/.librewolf/native-messaging-hosts` and `~/.config/BraveSoftware/Brave-Origin/NativeMessagingHosts`, plus `librewolf` in `/etc/1password/custom_allowed_browsers`. Re-run it after `brew upgrade` and after every `bootc switch` (groups and `/etc/1password` live in `/etc`).
 - `libvirtd.socket` + `libvirtd.service` enabled at boot.
 
-_Last updated: 2026-09-15_
+_Last updated: 2026-10-06_
 
 ## Repository Layout
 
 | Path | Purpose |
 |---|---|
 | `Containerfile` | Multi-stage build; pins `common`/`brew`/base digests (Renovate bumps) |
-| `build/10-build.sh` | Fedora packages (cups-pdf, virt stack) + Zed COPR + services |
-| `build/20-onepassword.sh` | 1Password repo + install + sysusers.d |
-| `build/30-browsers.sh` | Brave Origin + LibreWolf repos, native-messaging symlink, policies |
+| `build/10-build.sh` | Fedora packages (cups-pdf, virt stack) + services |
+| `build/30-browsers.sh` | Brave Origin + LibreWolf repos, managed policies |
 | `build/40-epson-printers.sh` | Vendored Epson RPMs (`--nodigest`, legacy signatures) |
 | `overrides/brave/laptop-os.json` | Brave managed policies |
 | `overrides/librewolf/librewolf.overrides.cfg` | LibreWolf loosened prefs (source of truth) |
 | `rpms/` | Vendored Epson drivers + SHA256SUMS |
-| `custom/flatpaks/default.preinstall` | First-boot Flatpaks (14 apps) |
+| `custom/flatpaks/default.preinstall` | First-boot Flatpaks (12 apps) |
+| `custom/brew/apps.Brewfile` | 1Password app/CLI + Zed as Linux casks |
+| `custom/ujust/custom-apps.just` | `ujust install-apps` + Brewfile shortcuts |
 | `custom/ujust/custom-system.just` | `ujust` recipes incl. overrides activation |
 
 Deeper guides live in each subdirectory's `README.md`; template architecture doc is [upstream](https://github.com/projectbluefin/finpilot#architecture).
@@ -129,15 +130,19 @@ All previous rpm-ostree layers (1Password, virt stack, cups-pdf, Epson LocalPack
    cp -a ~/.var/app/org.mozilla.firefox/.mozilla/firefox/* ~/.librewolf/
    ```
    If the profile does not load, create `~/.librewolf/profiles.ini` pointing `Path=` at the copied profile directory.
-3. Launch LibreWolf: verify bookmarks, logins, extensions, and that the 1Password extension unlocks against the desktop app (native messaging symlink is baked).
-4. Migrate the Zed config into the image's RPM build, then launch and check settings:
+3. Install the cask apps and wire native messaging:
+   ```bash
+   ujust install-apps
+   ```
+4. Launch LibreWolf: verify bookmarks, logins, extensions, and that the 1Password extension unlocks against the desktop app.
+5. Migrate the Zed config from the Flatpak to the cask build, then launch and check settings (the cask `zed` is on `PATH` via Homebrew, config path unchanged):
    ```bash
    cp -a ~/.var/app/dev.zed.Zed/config/zed ~/.config/zed
    ```
-5. 1Password needs no migration (RPM→RPM, same `~/.config/1Password` path): launch, sign in, `op whoami`.
-6. Verify Brave Origin: it ships with 1Password X force-installed. The old Brave Flatpak keeps working in parallel until you migrate its profile.
-7. Print a test page on each Epson queue; `virsh list --all` (virt stack check).
-8. Only after everything checks out, remove superseded Flatpaks (no `--delete-data` — data stays in `~/.var/app` and on the NAS):
+6. 1Password stores its vault config at `~/.config/1Password` regardless of packaging: launch, sign in, `op whoami`.
+7. Verify Brave Origin: it ships with 1Password X force-installed. The old Brave Flatpak keeps working in parallel until you migrate its profile.
+8. Print a test page on each Epson queue; `virsh list --all` (virt stack check).
+9. Only after everything checks out, remove superseded Flatpaks (no `--delete-data` — data stays in `~/.var/app` and on the NAS):
    ```bash
    flatpak uninstall org.mozilla.firefox dev.zed.Zed org.mozilla.thunderbird_esr org.mozilla.Thunderbird
    ```
@@ -150,9 +155,11 @@ Pick the previous Bluefin deployment in GRUB and reboot. `/var/home` is untouche
 
 ## Gotchas (learned here)
 
-- **Real `/opt` required**: base image symlinks `/opt -> /var/opt`, which breaks rpm unpacking of 1Password/Brave Origin. Containerfile converts it to a real directory before build scripts; do not restore the symlink.
+- **Real `/opt` required**: base image symlinks `/opt -> /var/opt`, which breaks rpm unpacking of Brave Origin and the vendored Epson drivers. Containerfile converts it to a real directory before build scripts; do not restore the symlink.
 - **Epson RPMs are legacy-signed**: need `rpm --nodigest --nosignature`; integrity enforced by `rpms/SHA256SUMS`.
-- **bootc lint sysusers check**: RPMs creating groups without sysusers.d fragments fail `--fatal-warnings` (see `20-onepassword.sh`).
+- **bootc lint sysusers check**: RPMs creating groups without sysusers.d fragments fail `--fatal-warnings`. Nothing in this image creates groups at build time any more (1Password moved to Homebrew casks, which `groupadd` at runtime into mutable `/etc`).
+- **Homebrew casks need a terminal**: `apps.Brewfile` postflight steps run `sudo` (setgid `op`/`1Password-BrowserSupport`, setuid `chrome-sandbox`, polkit policy, `groupadd`). Never install it from a headless service, and trust the tap first — the `trusted: true` flag on the `tap` line does that inside `brew bundle`.
+- **`bootc switch` resets `/etc`**: the `onepassword*` groups and `/etc/1password/custom_allowed_browsers` that the casks create live in `/etc`, so a switch to a new image drops them. Homebrew itself lives in `/home` and survives. Re-run `ujust install-apps` after every switch.
 - **Build scripts must be executable** — `chmod +x build/*.sh` or CI fails with `Permission denied`.
 - **Actions must be allowed to create PRs**: repo setting "Allow GitHub Actions to create and approve pull requests" (API: `actions/permissions/workflow`).
 - **Flatpaks install on first boot** via `flatpak-preinstall.service`, not during `bootc switch`; Homebrew likewise via `brew-setup.service`. Wait for both before assuming failure.
