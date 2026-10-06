@@ -62,7 +62,7 @@
       "enabled": false
     },
     {
-      "description": "Hold the build runner at Ubuntu 24.04: projectbluefin/actions' setup-runner asserts ubuntu-24.04 when adding its apt source, and validate-flatpaks.yml pins the same runner because the baked apt lists on 26.04 name dropped package versions. Disable the major outright rather than filtering it with allowedVersions, whose range does not parse under the docker versioning a github-runner dep uses.",
+      "description": "Hold the flatpak validation runner at Ubuntu 24.04: the baked apt lists on a 26.04 runner name dropped package versions. build-image.yml and validate-renovate.yml have moved to 26.04 because projectbluefin/actions' setup-runner now supports it, so this rule only guards validate-flatpaks.yml and any future major. Disable the major outright rather than filtering it with allowedVersions, whose range does not parse under the docker versioning a github-runner dep uses. This rule does not block a hand-applied 26.04 bump to the two build workflows — remove it once validate-flatpaks.yml also moves.",
       "matchDepNames": ["ubuntu"],
       "matchUpdateTypes": ["major"],
       "enabled": false

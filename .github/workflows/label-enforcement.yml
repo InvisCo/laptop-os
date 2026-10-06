@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   enforce:
-    uses: projectbluefin/actions/.github/workflows/reusable-design-enforcement.yml@0debf71369e3e445c8bafaaf9cfa0cecae40613f
+    uses: projectbluefin/actions/.github/workflows/reusable-design-enforcement.yml@ae7d740d261d56354aeaf0a72af6f87e442e0472
     secrets: inherit
     with:
       required-field-groups: '[["What happened?","What would you like to see?","What specifically should the agent focus on?"]]'
