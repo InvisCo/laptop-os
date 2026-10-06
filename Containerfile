@@ -76,11 +76,13 @@ ARG IMAGE_NAME="laptop-os"
 ARG IMAGE_VENDOR="projectbluefin"
 ARG IMAGE_PRETTY_NAME="Laptop OS"
 ARG UBLUE_IMAGE_TAG="stable"
-# BASE_IMAGE_NAME is not declared here: `just build` derives it from the base
-# FROM line above, so swapping the base image cannot leave image-info.json
-# naming the old one. It used to be pinned to "silverblue" while the base was
-# Bluefin, and nothing read the FROM line to notice.
-#
+# BASE_IMAGE_NAME is declared empty here purely as a passthrough: buildah only
+# exposes a CLI --build-arg to a stage that declares a matching ARG, so omitting
+# it cut the value off before 00-image-info.sh. `just build` supplies it from the
+# base FROM line, so swapping the base image cannot leave image-info.json naming
+# the old one. No default is set: it used to be pinned to "silverblue" while the
+# base was Bluefin, and a bare ARG cannot repeat that.
+ARG BASE_IMAGE_NAME
 # FEDORA_MAJOR_VERSION is declared because the base tag cannot supply it. The
 # base is pinned to a Bluefin tag, whose version is Bluefin's build number, not
 # Fedora's major. 00-image-info.sh verifies this value against the base image's
