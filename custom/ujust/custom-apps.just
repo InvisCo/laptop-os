@@ -4,7 +4,6 @@
 ####################
 ## Example application installation commands
 ## See .agents/skills/finpilot-custom/SKILL.md for runtime layer guidance
-## See .agents/skills/finpilot-examples/SKILL.md for activation patterns
 
 # Install the GUI casks (1Password app + CLI, Zed) and wire 1Password native
 # messaging into the native RPM browsers. Needs a terminal: cask postflight

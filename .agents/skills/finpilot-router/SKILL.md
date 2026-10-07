@@ -37,7 +37,6 @@ description: >-
 | Fix CI or Renovate                             | `finpilot-ci` / `finpilot-maintain`    |
 | Open a PR                                      | `finpilot-pr-checklist`                |
 | Debug a build or deploy failure                | `finpilot-troubleshooting`             |
-| Follow a worked example                        | `finpilot-examples`                    |
 | Initialize/ rename this template               | `finpilot-templates`                   |
 | Orient to repo architecture                    | `finpilot-overview`                    |
 | Capture a durable lesson                       | `skill-improvement`                    |
