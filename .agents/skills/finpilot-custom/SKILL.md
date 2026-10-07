@@ -40,6 +40,7 @@ Brewfiles use Ruby syntax. They define Homebrew packages installed by users afte
 | `custom/brew/default.Brewfile`     | General purpose CLI tools               |
 | `custom/brew/development.Brewfile` | Development tools and environments      |
 | `custom/brew/fonts.Brewfile`       | Font packages                           |
+| `custom/brew/apps.Brewfile`        | GUI casks from `ublue-os/tap`           |
 | Custom `*.Brewfile`                | Create as needed for specific use cases |
 
 ### Syntax
@@ -54,16 +55,39 @@ brew "fd"         # Simple alternative to find
 # Taps (repositories)
 tap "homebrew/cask"
 
-# Casks
-brew "node"
-brew "python"
+# Casks (work on Linux; GUI apps from ublue-os/tap)
+tap "ublue-os/tap", trusted: true
+cask "1password-gui-linux"
+cask "zed-linux"
 ```
+
+### Linux Casks
+
+Homebrew casks run on Linux. `ublue-os/tap` ships Linux builds
+(`1password-gui-linux`, `1password-cli-linux`, `zed-linux`,
+`visual-studio-code-linux`, ...). Three constraints:
+
+1. **Trust the tap.** Third-party taps are untrusted by default. Declare
+   `tap "ublue-os/tap", trusted: true` — `brew bundle` trusts it, and
+   `build/validate-brewfiles.sh` accepts that literal form (it rejects computed
+   tap lines, which is the point).
+2. **Interactive sudo.** Casks with `postflight_steps` that touch `/etc`,
+   `groupadd`, or setuid/setgid bits run `sudo`. Ship them in their own Brewfile
+   (`apps.Brewfile`) behind a ujust recipe; never wire them into a systemd unit.
+3. **Mutable `/etc` output.** Groups and `/etc/1password/custom_allowed_browsers`
+   created by casks are reset by `bootc switch` (Homebrew itself lives in
+   `/home` and survives). Document "re-run the recipe after every switch".
+
+Keep casks out of `default.Brewfile` — that file must stay headless-installable.
 
 ### How Users Invoke Them
 
 Users install via `ujust` commands (shortcuts defined in `custom/ujust/*.just`):
 
 ```bash
+# Install GUI casks (interactive sudo)
+ujust install-apps
+
 # Install default apps
 ujust install-default-apps
 

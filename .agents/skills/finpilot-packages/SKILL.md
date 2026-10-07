@@ -32,18 +32,18 @@ description: >-
 | Request                        | Action                                        | Location                             |
 | ------------------------------ | --------------------------------------------- | ------------------------------------ |
 | Add a system package (dnf5)    | `dnf5 install -y pkg`                         | `build/10-build.sh`                  |
-| Add a COPR package             | `copr_install_isolated "owner/repo" pkg`      | `build/10-build.sh` (or `20-*.sh`)   |
-| Add a third-party repo package | Enable repo → `dnf5 install -y` → remove repo | `build/20-*.sh` (see examples)       |
+| Add a COPR package             | `copr_install_isolated "owner/repo" pkg`      | `build/10-build.sh` (or `30-*.sh`)   |
+| Add a third-party repo package | Enable repo → `dnf5 install -y` → remove repo | `build/30-*.sh` (see `30-browsers.sh`) |
 | Add a CLI tool (runtime)       | `brew "pkg"`                                  | `custom/brew/default.Brewfile`       |
 | Add a dev environment tool     | `brew "pkg"`                                  | `custom/brew/development.Brewfile`   |
 | Add a font                     | `brew "font-xyz"`                             | `custom/brew/fonts.Brewfile`         |
 | Add a GUI app                  | `[Flatpak Preinstall org.app.id]`             | `custom/flatpaks/default.preinstall` |
+| Add a GUI app as a native Linux cask | `tap "ublue-os/tap", trusted: true` + `cask "x-linux"` | `custom/brew/apps.Brewfile` |
 | Add a user command             | Create shortcut (NO dnf5)                     | `custom/ujust/*.just`                |
 | Enable a systemd service       | `systemctl enable service.name`               | `build/10-build.sh`                  |
-| Replace desktop environment    | Remove old → install new → set default        | `build/30-*.sh` (see examples)       |
+| Replace desktop environment    | Remove old → install new → set default        | `build/50-cosmic-desktop.sh` (active) |
 | Switch base image              | Update `FROM` line                            | `Containerfile`                      |
 | Add OCI containers             | Uncomment/add `COPY --from=`                  | `Containerfile` ctx stage            |
-| Add NVIDIA GPU support         | Rename `40-nvidia.sh.example`, then add its RUN block after `10-build.sh` | `build/40-nvidia.sh` |
 
 ## Build-Time: `build/10-build.sh`
 
@@ -90,9 +90,10 @@ copr_install_isolated "ublue-os/staging" package-name
 
 **Never leave a COPR enabled after install.**
 
-## Third-Party Repos: `build/20-*.sh`
+## Third-Party Repos: `build/30-*.sh`
 
-For Google Chrome, 1Password, VS Code, etc. Follow the example scripts.
+For Google Chrome, VS Code, etc. `build/30-browsers.sh` (active) is the
+reference: Brave Origin and LibreWolf repos enabled, installed, then removed.
 
 **Pattern:**
 
@@ -101,13 +102,21 @@ For Google Chrome, 1Password, VS Code, etc. Follow the example scripts.
 3. `dnf5 install -y` the package(s)
 4. **CRITICAL**: Remove the repo file at end of script
 
-See `build/20-onepassword.sh.example` for a complete working example.
+See `build/30-browsers.sh` (active) for the pattern in practice: Brave Origin
+and LibreWolf repos enabled, installed, then removed.
 
 ## Runtime Brew: `custom/brew/*.Brewfile`
 
 Homebrew is for CLI tools and development environments, installed by users
 after first boot. File locations, syntax, and validation:
 `finpilot-custom`.
+
+GUI apps can also ship as **Linux casks** from `ublue-os/tap`
+(`1password-gui-linux`, `1password-cli-linux`, `zed-linux`). Prefer a cask over
+a build-time RPM when upstream has no Fedora repo, the app floats faster than
+image releases, or its `/etc` artifacts should stay out of the image. Casks
+need `trusted: true` on the tap line and interactive sudo — see
+`finpilot-custom` for the constraints.
 
 ## Runtime Flatpak: `custom/flatpaks/*.preinstall`
 
@@ -133,7 +142,6 @@ in `finpilot-ci`.
 | "I'll put this CLI tool in `build/10-build.sh` so it's always available." | Build-time packages bloat the image and slow updates. Runtime Brew is preferred for CLI tools that users can install on demand. |
 | "I'll add a GUI app via dnf5 so it works offline."                        | Flatpaks are the standard for GUI apps. They update independently and avoid base image bloat.                                   |
 | "COPR packages are safe to leave enabled."                                | Enabled COPRs persist and can cause conflicts on updates. Always use `copr_install_isolated`.                                   |
-| "I'll just add the package to the example script and rename it later."    | Active `.sh` scripts run on every build. Only `.example` files are inactive. Rename carefully.                                  |
 
 ## Red Flags
 
@@ -142,7 +150,6 @@ in `finpilot-ci`.
 - Not removing a third-party repo file after package install
 - Adding GUI apps via `dnf5` instead of Flatpak
 - Adding CLI tools to `build/10-build.sh` without considering runtime Brew first
-- Modifying `build/*.example` files without renaming to `.sh`
 
 ## Verification
 

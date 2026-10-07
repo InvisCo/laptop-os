@@ -24,6 +24,21 @@ Brewfiles are Homebrew's way of declaring packages in a declarative format. They
 - [`default.Brewfile`](default.Brewfile) - Essential command-line tools
 - [`development.Brewfile`](development.Brewfile) - Development tools and languages
 - [`fonts.Brewfile`](fonts.Brewfile) - Programming fonts
+- [`apps.Brewfile`](apps.Brewfile) - GUI casks from `ublue-os/tap` (1Password app/CLI, Zed)
+
+### Linux casks
+
+Homebrew casks work on Linux, and [ublue-os/tap](https://github.com/ublue-os/homebrew-tap)
+ships Linux builds of GUI apps (`1password-gui-linux`, `1password-cli-linux`,
+`zed-linux`, `visual-studio-code-linux`, ...). Two constraints:
+
+1. Third-party taps must be trusted before Homebrew will run their code. Declare
+   it as `tap "ublue-os/tap", trusted: true` — `brew bundle` trusts it, and
+   `build/validate-brewfiles.sh` accepts that literal form.
+2. Cask postflight steps that touch `/etc`, `groupadd`, or setuid/setgid bits run
+   `sudo`. Install those Brewfiles interactively (`ujust install-apps`), never
+   from a systemd unit. The runtime artifacts they create live in `/etc` and are
+   reset by `bootc switch`, so re-run the recipe after every switch.
 
 ### Installing Packages from Brewfiles
 
@@ -35,6 +50,7 @@ brew bundle --file /usr/share/ublue-os/homebrew/default.Brewfile
 
 Or use the convenient ujust commands defined in [`custom/ujust/custom-apps.just`](../ujust/custom-apps.just):
 ```bash
+ujust install-apps
 ujust install-default-apps
 ujust install-dev-tools
 ujust install-fonts

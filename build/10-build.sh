@@ -9,10 +9,6 @@ set -euo pipefail
 # It uses set -euo pipefail for strict error handling.
 ###############################################################################
 
-# Source helper functions
-# shellcheck source=/dev/null
-source /ctx/build/copr-helpers.sh
-
 # Enable nullglob for all glob operations to prevent failures on empty matches
 shopt -s nullglob
 
@@ -63,10 +59,6 @@ dnf5 install -y tmux gum
 # cups-pdf      - virtual PDF printer
 # virt stack    - libvirt, qemu-kvm, virt-manager for VM workflows
 dnf5 install -y cups-pdf libvirt qemu-kvm virt-manager
-
-### Zed editor via COPR (not packaged in Fedora repos)
-# cjatherton/zed tracks upstream releases and builds for fedora-44.
-copr_install_isolated "cjatherton/zed" zed
 
 echo "::endgroup::"
 

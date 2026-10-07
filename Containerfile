@@ -107,7 +107,7 @@ RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
 # Set dnf options before build scripts (persists across subsequent RUN layers)
 RUN dnf5 config-manager setopt keepcache=1 install_weak_deps=0
 
-# laptop-os ships RPMs that unpack into a real /opt (1Password, Brave Origin).
+# laptop-os ships RPMs that unpack into a real /opt (Brave Origin, Epson escpr).
 # The base image symlinks /opt -> /var/opt which breaks rpm cpio unpacking,
 # so swap in a real directory before any build script runs. Unlike the
 # template default, this stays a real directory for the life of the image.
@@ -125,14 +125,6 @@ RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
     --mount=type=tmpfs,dst=/boot \
     --mount=type=tmpfs,dst=/tmp \
     /ctx/build/10-build.sh
-
-RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
-    --mount=type=cache,dst=/var/cache/libdnf5 \
-    --mount=type=cache,dst=/var/cache/rpm-ostree \
-    --mount=type=secret,id=GITHUB_TOKEN \
-    --mount=type=tmpfs,dst=/boot \
-    --mount=type=tmpfs,dst=/tmp \
-    /ctx/build/20-onepassword.sh
 
 RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
     --mount=type=cache,dst=/var/cache/libdnf5 \
@@ -170,8 +162,8 @@ RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
 
 ### /opt
 ## laptop-os keeps /opt as a real directory (see early RUN above) because
-## 1Password and Brave Origin install into it. Do NOT replace it with the
-## template's `ln -s /var/opt /opt` symlink.
+## Brave Origin and the vendored Epson drivers install into it. Do NOT replace
+## it with the template's `ln -s /var/opt /opt` symlink.
 
 ### INIT
 ## Required for bootc images

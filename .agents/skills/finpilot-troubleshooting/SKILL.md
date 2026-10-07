@@ -44,18 +44,6 @@ description: >-
 | Multi-stage build fails at `ctx` stage | Missing `COPY --from=` or invalid OCI image reference            | Verify OCI image names and digests in `Containerfile` ctx stage                  |
 | `just build` fails immediately         | `just` not installed or `Justfile` syntax error                  | Run `just --list`, check `Justfile` for syntax errors                            |
 
-## NVIDIA-Specific Issues
-
-| Symptom                                    | Cause                                              | Solution                                                                                               |
-| ------------------------------------------ | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| `nvidia-smi` not found after boot          | NVIDIA driver was not installed during build       | Rename `40-nvidia.sh.example` to `.sh`, add its RUN block after `10-build.sh`, and rebuild |
-| NVIDIA build fails: "Signing key not found" | ublue-os/staging COPR GPG key not imported         | Add `rpm --import https://download.copr.fedorainfracloud.org/results/ublue-os/staging/pubkey.gpg` before `nvidia-install.sh` |
-| NVIDIA build fails: akmods pull fails      | Wrong `AKMODS_FLAVOR` or kernel version mismatch   | Verify `AKMODS_FLAVOR` matches your base image (`main` for stock Fedora, `coreos-stable` for bluefin kernel); check kernel version with `rpm -q kernel-core` |
-| Wayland broken on NVIDIA                   | Missing `nvidia-drm.modeset=1` or `kms-modifiers`  | Confirm `/usr/lib/bootc/kargs.d/00-nvidia.toml` exists with modeset karg; verify `kms-modifiers` was added to Mutter gschema override |
-| Podman GPU passthrough not working         | CDI not configured or `nvidia-container-toolkit` missing | Verify `nvidia-container-toolkit-base` is installed; check `nvidia-ctk config --set nvidia-container-cli.no-cgroups --in-place` ran |
-| `nouveau_icd` conflicts with NVIDIA driver | Nouveau Vulkan ICD not removed                     | Add `rm -f /usr/share/vulkan/icd.d/nouveau_icd.*.json` in the NVIDIA script                           |
-| Container fails with "device not found"    | NVIDIA kernel module not loaded                    | Reboot after switching to NVIDIA image; verify `lsmod \| grep nvidia`; check kernel arg blacklist isn't too aggressive |
-
 ## CI Failures
 
 | Symptom                                                                 | Cause                                                                                                                                       | Solution                                                                                                                  |
@@ -104,6 +92,17 @@ description: >-
 | COPR packages missing after boot        | COPR not disabled correctly, repo persists but packages don't | Use `copr_install_isolated` from `build/copr-helpers.sh` — it enables, installs, and disables |
 | COPR conflicts on update                | Multiple COPRs enabled simultaneously                         | Ensure all COPRs are disabled after install, use isolated installs only                       |
 | `dnf5 copr list` shows unexpected repos | Old COPR not cleaned up                                       | Remove repo files from `/etc/yum.repos.d/` if not managed by `copr_install_isolated`          |
+
+## Homebrew Cask Issues
+
+| Symptom                                                       | Cause                                                            | Solution                                                                                                                                   |
+| ------------------------------------------------------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `brew bundle` refuses the tap / untrusted tap warning         | Third-party taps are untrusted by default since Homebrew 4.5     | Declare `tap "ublue-os/tap", trusted: true` in the Brewfile, or run `brew trust ublue-os/tap`                                              |
+| Cask install fails in a systemd unit / non-interactive shell | Cask `postflight_steps` need `sudo` (setuid/setgid, `groupadd`, `/etc`) | Install the cask Brewfile from a terminal (`ujust install-apps`); keep it out of `default.Brewfile`                                       |
+| Browser extension cannot reach the 1Password app              | Manifest points at a removed path, or the browser scans its own directory | Re-run `ujust install-apps`; LibreWolf needs `~/.librewolf/native-messaging-hosts`, Brave Origin needs `Brave-Origin/NativeMessagingHosts` |
+| 1Password refuses a forked browser                            | Browser binary not in `/etc/1password/custom_allowed_browsers`    | Append the binary name (`librewolf`), then restart the app                                                                                 |
+| `mv EPERM` on a native messaging manifest                    | Manifest locked with `chattr +i` by an external bridge            | Casks detect the lock and skip it; `sudo chattr -i <manifest>` to hand control back to Homebrew                                            |
+| Groups/allowlist gone after `bootc switch`                    | `onepassword*` groups and `/etc/1password` are mutable `/etc` state | Re-run `ujust install-apps` after every switch; Homebrew in `/home` survives                                                               |
 
 ## ujust Command Not Found
 
