@@ -13,22 +13,37 @@ links lives in `.agents/skills/README.md`.
 ## Branch Strategy
 
 - `main` is the **testing branch** — all feature and Renovate PRs land here,
-  and pushes publish `:stable-testing` images.
-- `stable` is the **production branch** — pushes publish `:stable` images
-  (a push is skipped when its diff only touches `paths-ignore` files; the
-  `publish-stable` job below compensates).
-- Promotion is `main` → `stable` via PRs opened by
-  `.github/workflows/promote-main-to-stable.yml`, a local replacement for the
-  factory `projectbluefin/actions` `reusable-promote-squash.yml`.
-  Promotions merge via **fast-forward** — `stable` becomes `main`'s exact SHA
-  and never gains unique commits, so promotion PRs cannot conflict (squash
-  promotions created stable-only commits and recurring `Containerfile` merge
-  conflicts). A `--merge` fallback covers direct `stable` hotfixes, which
-  `sync-stable-to-main.yml` (`reusable-sync-branches.yml`) merges back into
-  `main` (on stable push and on a 6-hour cron). A `publish-stable` job in the
-  promotion workflow dispatches a `stable` build whenever the branch's tree
-  lags the last successful `:stable` build (covers `paths-ignore` pushes and
-  push-event blackouts).
+  and pushes publish `:stable-testing` and `:testing` images.
+- `stable` is the **production branch** — it receives **no builds**. Pushing to
+  it runs `.github/workflows/execute-release.yml`, which verifies the current
+  `:testing` candidate's cosign signature and copies that exact digest to
+  `:stable`. It never rebuilds, so `:stable` is byte-for-byte what was tested on
+  `main`.
+- Promotion is `main` → `stable` via the PR opened by
+  `.github/workflows/promote-main-to-stable.yml`, a thin caller for the factory
+  `projectbluefin/actions` `reusable-promote-squash.yml`. It runs daily on a
+  cron and on manual dispatch.
+- Promotions merge via **squash** — `stable` gains one
+  `chore: promote main to stable` commit per promotion. The trees stay
+  identical, so `sync-stable-to-main.yml` (`reusable-sync-branches.yml`) no-ops
+  on a normal promotion. Squash is **required**, not preferred:
+  `execute-release.yml` identifies a promotion by the pushed commit's subject,
+  and a fast-forward merge lands no new commit, so the release is refused as a
+  non-promotion push.
+- The promotion branch is `auto/promote-main-to-stable`, and
+  `pr-validation.yml` fails the PR if its tree does not match `main`'s.
+- `sync-stable-to-main.yml` also runs on a 6-hour cron. That cron is a real
+  safety net, not vestigial: GitHub push events on `stable` blacked out
+  entirely here for two weeks (Aug 30 – Sep 14 2026), and under digest
+  promotion a dropped push means `:stable` silently goes stale. Recover with
+  `gh workflow run execute-release.yml`.
+- `promote-main-to-stable.yml` sets `request_reviewer: false` because a personal
+  account has no `<owner>/maintainers` team, `use_merge_queue: false` because a
+  merge queue needs an organization, and `enqueue_promotion: false` because the
+  reusable exposes no merge-method input. **Merge the promotion PR from the UI,
+  not from a bot**: a merge performed as `github-actions` creates no workflow
+  runs, so `execute-release.yml` never fires and the release degrades to a
+  manual dispatch.
 - Decision record: the factory reusable workflow was chosen over the external
   pull[bot] app (issues #235/#237). Do not add `.github/pull.yml`.
 - Never commit directly to `stable`; it receives only promotion PRs.
@@ -38,17 +53,19 @@ links lives in `.agents/skills/README.md`.
 1. Open changes against `main`.
 2. Merge only after required validation and image build checks pass.
 3. Test `ghcr.io/OWNER/IMAGE:stable-testing`.
-4. Review the auto-opened promotion PR from `main` to `stable`.
-5. Merge the promotion to publish `ghcr.io/OWNER/IMAGE:stable`.
+4. Review the auto-opened promotion PR from `auto/promote-main-to-stable`.
+5. Merge it in the UI. `execute-release.yml` gates the candidate and promotes
+   the signed digest to `ghcr.io/OWNER/IMAGE:stable`.
 
-| Branch   | Image tag         | Audience                       |
-| -------- | ----------------- | ------------------------------ |
-| `main`   | `:stable-testing` | Testers and release candidates |
-| `stable` | `:stable`         | Production systems             |
+| Branch   | Image tag                       | Audience                       |
+| -------- | ------------------------------- | ------------------------------ |
+| `main`   | `:stable-testing`, `:testing`   | Testers and release candidates |
+| `stable` | `:stable` (promoted digest)     | Production systems             |
 
-The promotion release gate verifies cosign signatures on the `:testing` tag;
-keyless signing is enabled by default in `build-image.yml` ("Sign and publish"
-step) and reports `release/ready` once a signed `:testing` image exists.
+The release gate verifies cosign signatures on the `:testing` tag. Keyless
+signing is enabled by default in `build-image.yml` ("Sign and publish" step) and
+reports `release/ready` once a signed `:testing` image exists. A failed
+signature check rejects the candidate and preserves the prior `:stable`.
 
 ## CRITICAL: GitHub API Usage
 

@@ -44,18 +44,6 @@ description: >-
 | Multi-stage build fails at `ctx` stage | Missing `COPY --from=` or invalid OCI image reference            | Verify OCI image names and digests in `Containerfile` ctx stage                  |
 | `just build` fails immediately         | `just` not installed or `Justfile` syntax error                  | Run `just --list`, check `Justfile` for syntax errors                            |
 
-## NVIDIA-Specific Issues
-
-| Symptom                                    | Cause                                              | Solution                                                                                               |
-| ------------------------------------------ | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| `nvidia-smi` not found after boot          | NVIDIA driver was not installed during build       | Rename `40-nvidia.sh.example` to `.sh`, add its RUN block after `10-build.sh`, and rebuild |
-| NVIDIA build fails: "Signing key not found" | ublue-os/staging COPR GPG key not imported         | Add `rpm --import https://download.copr.fedorainfracloud.org/results/ublue-os/staging/pubkey.gpg` before `nvidia-install.sh` |
-| NVIDIA build fails: akmods pull fails      | Wrong `AKMODS_FLAVOR` or kernel version mismatch   | Verify `AKMODS_FLAVOR` matches your base image (`main` for stock Fedora, `coreos-stable` for bluefin kernel); check kernel version with `rpm -q kernel-core` |
-| Wayland broken on NVIDIA                   | Missing `nvidia-drm.modeset=1` or `kms-modifiers`  | Confirm `/usr/lib/bootc/kargs.d/00-nvidia.toml` exists with modeset karg; verify `kms-modifiers` was added to Mutter gschema override |
-| Podman GPU passthrough not working         | CDI not configured or `nvidia-container-toolkit` missing | Verify `nvidia-container-toolkit-base` is installed; check `nvidia-ctk config --set nvidia-container-cli.no-cgroups --in-place` ran |
-| `nouveau_icd` conflicts with NVIDIA driver | Nouveau Vulkan ICD not removed                     | Add `rm -f /usr/share/vulkan/icd.d/nouveau_icd.*.json` in the NVIDIA script                           |
-| Container fails with "device not found"    | NVIDIA kernel module not loaded                    | Reboot after switching to NVIDIA image; verify `lsmod \| grep nvidia`; check kernel arg blacklist isn't too aggressive |
-
 ## CI Failures
 
 | Symptom                                                                 | Cause                                                                                                                                       | Solution                                                                                                                  |
@@ -71,8 +59,8 @@ description: >-
 | CI build fails: composite action not found                              | Wrong commit SHA or repo name in `uses:`                                                                                                    | Verify `projectbluefin/actions` SHA, check network access                                                                 |
 | CI build succeeds but image not published                               | Wrong `IMAGE_NAME` or `IMAGE_VENDOR`                                                                                                        | Check `Containerfile` ARGs, verify `clean.yml` package name matches                                                       |
 | Promotion gate blocked: `release/blocked`, cosign "no signatures found" | Image pushed by an older template snapshot before signing was default, or the `Sign and publish` step failed silently (`continue-on-error`) | Merge a new build on `main` so a signed `:testing` image is published; check the build log's sign step for errors         |
-| Push to `stable` fires no Actions runs | GitHub push-event blackout on the branch (observed Aug 30 - Sep 14 2026; self-resolved) | Check `gh api repos/OWNER/REPO/actions/runs?branch=stable`; publish with `gh workflow run build-image.yml --repo OWNER/REPO --ref stable`; the `publish-stable` job self-heals on the next `main` push |
-| Promotion merged but `:stable` image not updated | Promotion diff only touched `paths-ignore` files (validate workflows, `.md`), so the `stable` build was skipped | `gh workflow run build-image.yml --repo OWNER/REPO --ref stable`, or wait for the `publish-stable` job on the next `main` push |
+| Push to `stable` fires no Actions runs | GitHub push-event blackout on the branch (observed Aug 30 - Sep 14 2026; self-resolved). Under digest promotion this means `:stable` silently goes stale | Check `gh api repos/OWNER/REPO/actions/runs?branch=stable`; promote the current candidate with `gh workflow run execute-release.yml --repo OWNER/REPO` |
+| Promotion merged but `:stable` image not updated | `execute-release.yml` refused the push, or never ran. It requires the merge to have produced a `chore: promote ...` subject, so a fast-forward or bot-authored merge is refused by design | Read the failed run's log. Merge the promotion PR from the UI as a human, or `gh workflow run execute-release.yml --repo OWNER/REPO` after inspecting the candidate |
 | GHCR push fails: `uploading layer chunked: StatusCode: 400 <html>` | Transient registry gateway error mid-upload | Rerun the failed build (`gh run rerun <id>` or `gh workflow run`); if it persists, check GHCR status and file upstream |
 
 ## Runtime Issues
@@ -104,6 +92,19 @@ description: >-
 | COPR packages missing after boot        | COPR not disabled correctly, repo persists but packages don't | Use `copr_install_isolated` from `build/copr-helpers.sh` — it enables, installs, and disables |
 | COPR conflicts on update                | Multiple COPRs enabled simultaneously                         | Ensure all COPRs are disabled after install, use isolated installs only                       |
 | `dnf5 copr list` shows unexpected repos | Old COPR not cleaned up                                       | Remove repo files from `/etc/yum.repos.d/` if not managed by `copr_install_isolated`          |
+
+## Homebrew Cask Issues
+
+| Symptom                                                       | Cause                                                            | Solution                                                                                                                                   |
+| ------------------------------------------------------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `brew bundle` refuses the tap / untrusted tap warning         | Third-party taps are untrusted by default since Homebrew 4.5     | Declare `tap "ublue-os/tap", trusted: true` in the Brewfile, or run `brew trust ublue-os/tap`                                              |
+| "Skipping cask … (requires macOS)", nothing installs on first run | `brew bundle` resolves bare cask tokens at load time, before its tap lines, so they hit `homebrew/cask` | Qualify the token: `cask "ublue-os/tap/zed-linux"`; run `brew trust` + `brew tap` before bundling                          |
+| Cask install fails in a systemd unit / non-interactive shell | Cask `postflight_steps` need `sudo` (setuid/setgid, `groupadd`, `/etc`) | Install the cask Brewfile from a terminal (`ujust install-apps`); keep it out of `default.Brewfile`                                       |
+| 1Password says "invalid group attempted to connect"          | Helper is not `root:onepassword 2755` — the cask's `sudo:` postflight was declined, so the setgid never landed | `ujust install-apps` repairs and asserts; confirm with `stat -c '%U:%G %a' "$(readlink -f "$(brew --prefix)/bin/1Password-BrowserSupport")"` |
+| Browser extension cannot reach the 1Password app              | Manifest points at a removed path, or the browser scans its own directory | Re-run `ujust install-apps`; LibreWolf needs `~/.librewolf/native-messaging-hosts`, Brave Origin needs `Brave-Origin/NativeMessagingHosts` |
+| 1Password refuses a forked browser                            | Browser binary not in `/etc/1password/custom_allowed_browsers`    | Append the binary name (`librewolf`), then restart the app                                                                                 |
+| `mv EPERM` on a native messaging manifest                    | Manifest locked with `chattr +i` by an external bridge            | Casks detect the lock and skip it; `sudo chattr -i <manifest>` to hand control back to Homebrew                                            |
+| Groups/allowlist gone after `bootc switch`                    | `onepassword*` groups and `/etc/1password` are mutable `/etc` state | Re-run `ujust install-apps` after every switch; Homebrew in `/home` survives                                                               |
 
 ## ujust Command Not Found
 

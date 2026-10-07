@@ -40,6 +40,7 @@ Brewfiles use Ruby syntax. They define Homebrew packages installed by users afte
 | `custom/brew/default.Brewfile`     | General purpose CLI tools               |
 | `custom/brew/development.Brewfile` | Development tools and environments      |
 | `custom/brew/fonts.Brewfile`       | Font packages                           |
+| `custom/brew/apps.Brewfile`        | GUI casks from `ublue-os/tap`           |
 | Custom `*.Brewfile`                | Create as needed for specific use cases |
 
 ### Syntax
@@ -54,16 +55,50 @@ brew "fd"         # Simple alternative to find
 # Taps (repositories)
 tap "homebrew/cask"
 
-# Casks
-brew "node"
-brew "python"
+# Casks (work on Linux; GUI apps from ublue-os/tap, tokens fully qualified)
+tap "ublue-os/tap", trusted: true
+cask "ublue-os/tap/1password-gui-linux"
+cask "ublue-os/tap/zed-linux"
 ```
+
+### Linux Casks
+
+Homebrew casks run on Linux. `ublue-os/tap` ships Linux builds
+(`1password-gui-linux`, `1password-cli-linux`, `zed-linux`,
+`visual-studio-code-linux`, ...). Four constraints:
+
+1. **Trust the tap.** Third-party taps are untrusted by default. Declare
+   `tap "ublue-os/tap", trusted: true` — `brew bundle` trusts it, and
+   `build/validate-brewfiles.sh` accepts that literal form (it rejects computed
+   tap lines, which is the point).
+2. **Qualify the tokens.** Write `cask "ublue-os/tap/zed-linux"`, never
+   `cask "zed-linux"`. `brew bundle` resolves tokens while loading the file,
+   before its own tap lines run, so a bare name resolves against
+   `homebrew/cask`, gets skipped as "requires macOS", and the first run installs
+   nothing. Running `brew trust ublue-os/tap` + `brew tap ublue-os/tap` before
+   `brew bundle` is the belt.
+3. **Interactive sudo.** Casks with `postflight_steps` that touch `/etc`,
+   `groupadd`, or setuid/setgid bits run `sudo`. Ship them in their own Brewfile
+   (`apps.Brewfile`) behind a ujust recipe; never wire them into a systemd unit.
+   Declining the prompt silently leaves the payload user-owned, so the recipe
+   must re-assert the contract and fail loudly — for 1Password that is
+   `root:onepassword 2755` on `1Password-BrowserSupport`, `root:onepassword-cli
+   2755` on `op`, `root:root 4755` on `chrome-sandbox`. See
+   `tests/template/install-apps_test.bats` for the assert pattern.
+4. **Mutable `/etc` output.** Groups and `/etc/1password/custom_allowed_browsers`
+   created by casks are reset by `bootc switch` (Homebrew itself lives in
+   `/home` and survives). Document "re-run the recipe after every switch".
+
+Keep casks out of `default.Brewfile` — that file must stay headless-installable.
 
 ### How Users Invoke Them
 
 Users install via `ujust` commands (shortcuts defined in `custom/ujust/*.just`):
 
 ```bash
+# Install GUI casks (interactive sudo)
+ujust install-apps
+
 # Install default apps
 ujust install-default-apps
 

@@ -5,9 +5,8 @@ set -euo pipefail
 
 ###############################################################################
 # Native browsers: Brave Origin (RPM, adblock built in, no rewards/crypto/VPN)
-# and LibreWolf (RPM from the official signed repository, with 1Password
-# native-messaging bridge). Firefox is intentionally NOT shipped;
-# LibreWolf is the primary.
+# and LibreWolf (RPM from the official signed repository). Firefox is
+# intentionally NOT shipped; LibreWolf is the primary.
 ###############################################################################
 
 ### Brave Origin from official repository
@@ -46,15 +45,6 @@ dnf5 install -y librewolf
 rm -f /etc/yum.repos.d/librewolf.repo
 
 echo "LibreWolf installed successfully"
-
-### 1Password <-> browser native messaging bridges
-# 1Password ships its Firefox-family native messaging manifest into
-# /usr/lib64/mozilla/native-messaging-hosts. LibreWolf only looks in its own
-# directory, so link them per upstream FAQ:
-# https://librewolf.net/docs/faq/#how-do-i-get-native-messaging-to-work
-echo "Wiring 1Password native messaging into LibreWolf..."
-mkdir -p /usr/lib/librewolf
-ln -sfn /usr/lib64/mozilla/native-messaging-hosts /usr/lib/librewolf/native-messaging-hosts
 
 ### Managed policies (password manager offloading)
 echo "Installing browser policies..."

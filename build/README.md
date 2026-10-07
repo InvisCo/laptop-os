@@ -4,25 +4,26 @@ This directory contains build scripts used during image creation. The default Co
 
 ## How It Works
 
-Scripts are named with a number prefix (e.g., `10-build.sh`, `20-onepassword.sh`) and run in ascending order during the container build process.
+Scripts are named with a number prefix (e.g., `10-build.sh`, `30-browsers.sh`) and run in ascending order during the container build process. A number can be vacated — gaps are fine.
 
 ## Included Scripts
 
 - **`10-build.sh`** - Main build script for base system modifications, package installation, and service configuration
-- **`20-onepassword.sh`** - 1Password desktop app + CLI from the official AgileBits repository (needs a real `/opt`, not the base symlink)
-- **`30-browsers.sh`** - Brave Origin (adblock built in, no rewards/crypto/VPN — no de-bloat policies needed upstream) + LibreWolf, 1Password native-messaging bridge, managed policies from `overrides/`
+- **`30-browsers.sh`** - Brave Origin (adblock built in, no rewards/crypto/VPN — no de-bloat policies needed upstream) + LibreWolf, managed policies from `overrides/`
 - **`40-epson-printers.sh`** - Vendored Epson drivers from `rpms/` (legacy signatures, `--nodigest --nosignature`)
+- **`50-cosmic-desktop.sh`** - COSMIC desktop swap (the pattern this repo used to ship as an example; it is active here)
+- **`clean-stage.sh`** - Build-artifact cleanup before `bootc container lint`
 
-## Example Scripts
+## Adding a Script
 
-- **`20-onepassword.sh.example`** - Example showing how to install software from third-party RPM repositories (Google Chrome, 1Password)
-- **`30-cosmic-desktop.sh.example`** - Example showing how to replace the GNOME desktop with COSMIC desktop
-- **`40-nvidia.sh.example`** - Example showing how to add NVIDIA drivers and CDI container support
+This repo ships no `.example` scripts — every script it carries is active, and
+the active scripts are the reference: `30-browsers.sh` for the third-party RPM
+repository pattern (enable repo → `dnf5 install -y` → remove the repo file),
+`50-cosmic-desktop.sh` for a desktop swap.
 
-To use an example script:
-1. Rename it to remove the `.example` extension (for example, `mv build/20-onepassword.sh.example build/20-onepassword.sh`).
-2. Add the standard `RUN` block below after the `10-build.sh` block in `Containerfile`, replacing `NN-example.sh` with the renamed script.
-3. Run `just build`.
+To add a script: create `NN-name.sh`, then add the standard `RUN` block below
+after the `10-build.sh` block in `Containerfile`, replacing `NN-name.sh` with
+your script's path.
 
 ```dockerfile
 RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
@@ -31,8 +32,11 @@ RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
     --mount=type=secret,id=GITHUB_TOKEN \
     --mount=type=tmpfs,dst=/boot \
     --mount=type=tmpfs,dst=/tmp \
-    /ctx/build/NN-example.sh
+    /ctx/build/NN-name.sh
 ```
+
+Removing a script is the reverse: delete the `RUN` block and the file. The
+number it vacated stays vacated — gaps are fine.
 
 ## Creating Your Own Scripts
 
@@ -50,7 +54,7 @@ Create numbered scripts for different purposes:
 
 ```bash
 #!/usr/bin/env bash
-set -oue pipefail
+set -euo pipefail
 
 echo "Running custom setup..."
 # Your commands here
@@ -58,7 +62,7 @@ echo "Running custom setup..."
 
 ### Best Practices
 
-- **Use descriptive names**: `40-nvidia.sh` is better than `40-stuff.sh`
+- **Use descriptive names**: `30-browsers.sh` is better than `30-stuff.sh`
 - **One purpose per script**: Easier to debug and maintain
 - **Clean up after yourself**: Remove temporary files and disable temporary repos
 - **Test incrementally**: Add one script at a time and test builds
@@ -66,7 +70,8 @@ echo "Running custom setup..."
 
 ### Disabling Scripts
 
-To disable an activated script, remove its corresponding `RUN` block from `Containerfile` and rename it back to `.example` (or remove it).
+To disable a script, remove its `RUN` block from `Containerfile`. Keep the file
+if you plan to re-activate it, delete it otherwise.
 
 ## Execution Order
 

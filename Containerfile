@@ -36,12 +36,12 @@
 
 # Base Image - Bluefin stable (F44, GNOME, kernel/akmods/udev/ujust/uupd baked in)
 # Renovate will keep the digest pin up to date.
-ARG BASE_IMAGE="ghcr.io/ublue-os/bluefin:stable@sha256:71a328c539a63bd8ff3aab0c5dcb047d094d8cade6c7bb3473200053edc265de"
+ARG BASE_IMAGE="ghcr.io/ublue-os/bluefin:stable@sha256:61c3d546bea3a0012378214de3603d9eadc2111330765a4a31b14215d4bacaea"
 ARG ESCPR_CFLAGS="-Wno-error=implicit-function-declaration -Wno-error=implicit-int -Wno-implicit-function-declaration"
 
 # OCI context images - imported below and pinned directly in their FROM lines.
 # The base image is pinned in the FROM line below and updated by Renovate.
-FROM ghcr.io/ublue-os/brew:latest@sha256:60ada2d65891d8797beef49d8b43f2108519cbbaf04c9c7363e1a008677fcd35 AS brew
+FROM ghcr.io/ublue-os/brew:latest@sha256:2aaf87e3757466bc28d056505a651c7ca5c56fd28f6ff709b34f3f5dbc860e89 AS brew
 
 # Context stage - combine local and imported OCI container resources
 FROM scratch AS ctx
@@ -76,7 +76,18 @@ ARG IMAGE_NAME="laptop-os"
 ARG IMAGE_VENDOR="projectbluefin"
 ARG IMAGE_PRETTY_NAME="Laptop OS"
 ARG UBLUE_IMAGE_TAG="stable"
-ARG BASE_IMAGE_NAME="silverblue"
+# BASE_IMAGE_NAME is declared empty here purely as a passthrough: buildah only
+# exposes a CLI --build-arg to a stage that declares a matching ARG, so omitting
+# it cut the value off before 00-image-info.sh. `just build` supplies it from the
+# base FROM line, so swapping the base image cannot leave image-info.json naming
+# the old one. No default is set: it used to be pinned to "silverblue" while the
+# base was Bluefin, and a bare ARG cannot repeat that.
+ARG BASE_IMAGE_NAME
+# FEDORA_MAJOR_VERSION is declared because the base tag cannot supply it. The
+# base is pinned to a Bluefin tag, whose version is Bluefin's build number, not
+# Fedora's major. 00-image-info.sh verifies this value against the base image's
+# own /usr/lib/os-release and fails the build on a mismatch, so a Fedora major
+# bump cannot leave the identity claiming the old one.
 ARG FEDORA_MAJOR_VERSION="44"
 ARG VERSION=""
 
@@ -96,7 +107,7 @@ RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
 # Set dnf options before build scripts (persists across subsequent RUN layers)
 RUN dnf5 config-manager setopt keepcache=1 install_weak_deps=0
 
-# laptop-os ships RPMs that unpack into a real /opt (1Password, Brave Origin).
+# laptop-os ships RPMs that unpack into a real /opt (Brave Origin, Epson escpr).
 # The base image symlinks /opt -> /var/opt which breaks rpm cpio unpacking,
 # so swap in a real directory before any build script runs. Unlike the
 # template default, this stays a real directory for the life of the image.
@@ -121,14 +132,6 @@ RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
     --mount=type=secret,id=GITHUB_TOKEN \
     --mount=type=tmpfs,dst=/boot \
     --mount=type=tmpfs,dst=/tmp \
-    /ctx/build/20-onepassword.sh
-
-RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
-    --mount=type=cache,dst=/var/cache/libdnf5 \
-    --mount=type=cache,dst=/var/cache/rpm-ostree \
-    --mount=type=secret,id=GITHUB_TOKEN \
-    --mount=type=tmpfs,dst=/boot \
-    --mount=type=tmpfs,dst=/tmp \
     /ctx/build/30-browsers.sh
 
 RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
@@ -138,6 +141,14 @@ RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
     --mount=type=tmpfs,dst=/boot \
     --mount=type=tmpfs,dst=/tmp \
     /ctx/build/40-epson-printers.sh
+
+RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
+    --mount=type=cache,dst=/var/cache/libdnf5 \
+    --mount=type=cache,dst=/var/cache/rpm-ostree \
+    --mount=type=secret,id=GITHUB_TOKEN \
+    --mount=type=tmpfs,dst=/boot \
+    --mount=type=tmpfs,dst=/tmp \
+    /ctx/build/50-cosmic-desktop.sh
 
 ### CLEANUP
 ## Use Bluefin's clean-stage.sh to remove build artifacts before linting.
@@ -151,8 +162,8 @@ RUN --mount=type=bind,from=ctx,source=/,target=/ctx \
 
 ### /opt
 ## laptop-os keeps /opt as a real directory (see early RUN above) because
-## 1Password and Brave Origin install into it. Do NOT replace it with the
-## template's `ln -s /var/opt /opt` symlink.
+## Brave Origin and the vendored Epson drivers install into it. Do NOT replace
+## it with the template's `ln -s /var/opt /opt` symlink.
 
 ### INIT
 ## Required for bootc images
