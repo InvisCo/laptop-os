@@ -31,7 +31,8 @@ Published as `ghcr.io/invisco/laptop-os:{stable,stable-testing,testing}`, keyles
 ### Configuration Changes
 
 - LibreWolf loosened-defaults overrides shipped to `/usr/share/laptop-os/librewolf/librewolf.overrides.cfg`; activate per user with `ujust laptop-os-librewolf-overrides`. Active prefs: DRM (EME), WebGL, search suggestions, Firefox Sync UI. GSB, RFP, canvas prompts intentionally untouched.
-- 1Password native messaging is wired at runtime by `ujust install-apps`: the casks generate manifests in `~/.mozilla/native-messaging-hosts` and `~/.config/BraveSoftware/Brave-Browser/NativeMessagingHosts`, and the recipe mirrors them into `~/.librewolf/native-messaging-hosts` and `~/.config/BraveSoftware/Brave-Origin/NativeMessagingHosts`, plus `librewolf` in `/etc/1password/custom_allowed_browsers`. Re-run it after `brew upgrade` and after every `bootc switch` (groups and `/etc/1password` live in `/etc`).
+- 1Password native messaging is wired at runtime by `ujust install-apps`: the casks generate manifests in `~/.mozilla/native-messaging-hosts` and `~/.config/BraveSoftware/Brave-Browser/NativeMessagingHosts`, and the recipe mirrors them into `~/.librewolf/native-messaging-hosts` and `~/.config/BraveSoftware/Brave-Origin/NativeMessagingHosts`, plus `brave-origin` and `librewolf` in `/etc/1password/custom_allowed_browsers` (appended only for browsers whose binary exists). Re-run it after `brew upgrade` and after every `bootc switch` (groups and `/etc/1password` live in `/etc`).
+- `ujust install-apps` re-asserts the permissions 1Password authenticates against — `root:onepassword 2755` on `1Password-BrowserSupport`, `root:onepassword-cli 2755` on `op`, `root:root 4755` on `chrome-sandbox`. The cask applies them through `sudo:` postflight steps, and a declined password prompt leaves them user-owned, which the app reports as "invalid group attempted to connect". The recipe repairs and then asserts, so it fails loudly instead of shipping an app that cannot talk to a browser.
 - `libvirtd.socket` + `libvirtd.service` enabled at boot.
 
 _Last updated: 2026-10-06_
@@ -133,6 +134,12 @@ All previous rpm-ostree layers (1Password, virt stack, cups-pdf, Epson LocalPack
 3. Install the cask apps and wire native messaging:
    ```bash
    ujust install-apps
+   ```
+   It prints `Repairing …` for the setuid/setgid bits the cask's sudo postflight
+   may not have applied, and ends with a `FAIL:` line if they did not land.
+   Confirm integration from the app log after toggling the browser on:
+   ```bash
+   grep -iE 'verified successfully|invalid group' ~/.config/1Password/logs/1Password_rCURRENT.log | tail
    ```
 4. Launch LibreWolf: verify bookmarks, logins, extensions, and that the 1Password extension unlocks against the desktop app.
 5. Migrate the Zed config from the Flatpak to the cask build, then launch and check settings (the cask `zed` is on `PATH` via Homebrew, config path unchanged):

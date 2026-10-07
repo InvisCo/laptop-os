@@ -12,8 +12,46 @@
 install-apps:
     #!/usr/bin/env bash
     set -euo pipefail
+
+    # Trust and tap before bundling: `brew bundle` resolves cask tokens while
+    # it loads the file, before its own tap lines run.
+    brew trust ublue-os/tap >/dev/null 2>&1 || brew trust ublue-os/tap
+    brew tap ublue-os/tap
     echo "Installing GUI applications via Homebrew casks..."
     brew bundle --file /usr/share/ublue-os/homebrew/apps.Brewfile
+
+    # The casks apply root ownership and setgid/setuid bits through Homebrew
+    # `sudo:` postflight steps. Decline the password prompt and they silently
+    # no-op, leaving the payload user-owned: 1Password authenticates the
+    # browser through the helper's peer group, so a helper that is not
+    # root:onepassword 2755 is rejected with "invalid group attempted to
+    # connect", and a world-writable user-owned helper is a privilege
+    # escalation vector. Repair, then assert - a deploy that ran is not a
+    # deploy that worked.
+    fix() {  # <bin> <user:group> <mode>
+        local target; target="$(readlink -f "$1")"
+        if [[ ! -e "${target}" ]]; then
+            echo "FAIL: $1 not found at ${target} - the cask did not install it." >&2
+            exit 1
+        fi
+        if [[ "$(stat -c '%U:%G %a' "${target}")" != "$2 $3" ]]; then
+            echo "  Repairing $1 -> $2 $3"
+            sudo chown "$2" "${target}" || true
+            sudo chmod "$3" "${target}" || true
+        fi
+        if [[ "$(stat -c '%U:%G %a' "$(readlink -f "$1")")" != "$2 $3" ]]; then
+            echo "FAIL: $1 is $(stat -c '%U:%G %a' "${target}"), not $2 $3." >&2
+            echo "       1Password cannot authenticate the browser. Re-run with sudo available." >&2
+            exit 1
+        fi
+    }
+    P="$(brew --prefix)"
+    # chrome-sandbox is not a declared cask binary, so it is not linked into
+    # bin: it lives next to the Electron payload, which is where Electron looks.
+    APP_DIR="$(dirname "$(readlink -f "$P/bin/1password")")"
+    fix "$P/bin/1Password-BrowserSupport" root:onepassword     2755
+    fix "$P/bin/op"                       root:onepassword-cli 2755
+    fix "$APP_DIR/chrome-sandbox"         root:root            4755
 
     # The casks write native messaging manifests and their wrapper into
     # ~/.mozilla and ~/.config/BraveSoftware/Brave-Browser. LibreWolf and Brave
@@ -32,12 +70,18 @@ install-apps:
            "$HOME/.config/BraveSoftware/Brave-Origin/NativeMessagingHosts"
     # ponytail: copies go stale after `brew upgrade`; re-run this recipe to refresh.
 
-    # LibreWolf is not in 1Password's shipped browser allowlist.
-    if ! grep -qxF librewolf /etc/1password/custom_allowed_browsers 2>/dev/null; then
-        printf 'librewolf\n' | sudo tee -a /etc/1password/custom_allowed_browsers >/dev/null
-    fi
+    # 1Password only talks to allowlisted browser binaries, and the cask seeds
+    # the file with upstream's list. Add this image's browsers.
+    for browser in brave-origin librewolf; do
+        [[ -x "/usr/bin/${browser}" ]] || continue
+        if ! grep -qxF "${browser}" /etc/1password/custom_allowed_browsers 2>/dev/null; then
+            printf '%s\n' "${browser}" | sudo tee -a /etc/1password/custom_allowed_browsers >/dev/null
+        fi
+    done
 
     echo "Restart 1Password, then enable each browser under Settings -> Integrations."
+    echo "Verify with:"
+    echo "  grep -iE 'verified successfully|invalid group' ~/.config/1Password/logs/1Password_rCURRENT.log | tail"
 
 # Install default applications via Homebrew
 [group('Apps')]
