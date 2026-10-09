@@ -43,10 +43,6 @@ done
 mkdir -p /usr/share/flatpak/preinstall.d/
 cp /ctx/custom/flatpaks/*.preinstall /usr/share/flatpak/preinstall.d/
 
-# laptop-os dock defaults over Bluefin's dash-to-dock (favorite-apps only)
-cp /ctx/overrides/dconf/zz1-laptop-os.gschema.override /usr/share/glib-2.0/schemas/
-glib-compile-schemas /usr/share/glib-2.0/schemas
-
 echo "::endgroup::"
 
 echo "::group:: Install Packages"

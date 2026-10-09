@@ -249,6 +249,38 @@ my-custom-command:
 - **Local check**: `just --list`
 - **Syntax validation**: `just --unstable --fmt --check -f custom/ujust/your-file.just`
 
+## Desktop UI defaults: `overrides/`
+
+`overrides/` holds files copied into the image verbatim by a `build/*.sh` step.
+Two shapes exist: managed-policy/config files for a specific app (`brave/`,
+`librewolf/`) and the desktop's own default config.
+
+### COSMIC dock favorites
+
+Desktop is COSMIC, so there is no dconf and no `favorite-apps`. cosmic-config
+stores one RON value per file, keyed by component and version:
+
+```
+overrides/cosmic/com.system76.CosmicAppList/v1/favorites   # Vec<String> of desktop IDs
+```
+
+`build/50-cosmic-desktop.sh` installs it to
+`/usr/share/cosmic/com.system76.CosmicAppList/v1/favorites`. cosmic-config falls
+back to that path (`XDG_DATA_DIRS`, prefix `cosmic`) on a per-key basis, so it
+only supplies values for users who have not pinned apps themselves.
+
+Rules:
+
+- **Install it in `50-cosmic-desktop.sh`, not `10-build.sh`.** The cosmic
+  packages ship their own default schema under `/usr/share/cosmic`.
+- **IDs are stored without `.desktop`.** cosmic's `get_app_id` strips it.
+- **An unmatched ID does not vanish** — it renders as a broken placeholder icon.
+  Verify IDs at build time (`30-browsers.sh` for browsers, `50-*.sh` for COSMIC
+  apps) rather than assuming a typo is harmless.
+- **`ujust set-dock-layout` copies the image file** over the user's
+  `~/.config/cosmic/...`. One source of truth; the applet watches the user
+  directory, so a plain write reloads live.
+
 ## Validation Workflows by File Type
 
 | File Type      | Validation Workflow      | What It Checks              |

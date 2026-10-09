@@ -62,17 +62,17 @@ mkdir -p /usr/share/laptop-os/librewolf
 install -m 0644 /ctx/overrides/librewolf/librewolf.overrides.cfg \
     /usr/share/laptop-os/librewolf/librewolf.overrides.cfg
 
-# Verify the .desktop IDs the dock override expects. A renamed .desktop file
-# silently vanishes from favorite-apps, so fail loudly here instead.
-for desktop_id in librewolf.desktop brave-origin.desktop; do
-    if ! ls /usr/share/applications/"${desktop_id}" >/dev/null 2>&1; then
-        echo "WARNING: expected /usr/share/applications/${desktop_id} not found."
+# Verify the .desktop IDs the dock defaults expect. A renamed .desktop file
+# silently vanishes from the dock, so fail loudly here instead.
+for desktop_id in librewolf brave-origin; do
+    if ! ls /usr/share/applications/"${desktop_id}".desktop >/dev/null 2>&1; then
+        echo "WARNING: expected /usr/share/applications/${desktop_id}.desktop not found."
         echo "Installed browser .desktop files:"
         for f in /usr/share/applications/*brave* /usr/share/applications/*librewolf* /usr/share/applications/*wolf*; do
             [[ -e "$f" ]] && basename "$f"
         done
         echo "If the RPM renamed its .desktop file, update"
-        echo "overrides/dconf/zz1-laptop-os.gschema.override and custom/ujust/custom-migrate.just"
+        echo "overrides/cosmic/com.system76.CosmicAppList/v1/favorites"
     fi
 done
 

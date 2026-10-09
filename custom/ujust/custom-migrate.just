@@ -7,15 +7,27 @@
 ## every phase idempotent). User-level tools only by rule — brew/flatpak/gsettings.
 
 # Apply the laptop-os dock layout to the live user DB.
-# Image gschema defaults only reach new users; migrated users need this.
+# Image defaults only reach users who have never pinned an app themselves;
+# cosmic-config resolves `favorites` per key from the local file first, so
+# anyone with an existing ~/.config/cosmic/... needs this.
 [group('System')]
 set-dock-layout:
     #!/usr/bin/env bash
     set -euo pipefail
-    FAVORITES="['librewolf.desktop', 'brave-origin.desktop', 'org.gnome.Nautilus.desktop', 'eu.betterbird.Betterbird.desktop', 'org.gnome.Ptyxis.desktop', 'org.gnome.gitlab.cheywood.Buffer.desktop']"
-    gsettings set org.gnome.shell favorite-apps "$FAVORITES"
-    echo "Dock layout applied. Missing IDs vanish silently — verify with:"
-    echo "  gsettings get org.gnome.shell favorite-apps"
+    SRC="/usr/share/cosmic/com.system76.CosmicAppList/v1/favorites"
+    DST="$HOME/.config/cosmic/com.system76.CosmicAppList/v1"
+    if [[ ! -f "$SRC" ]]; then
+        echo "Image dock defaults missing at $SRC - is this laptop-os?" >&2
+        exit 1
+    fi
+    # Seed first, then copy: cosmic-config watches the user directory and
+    # ignores .atomicwrite* temp files, so a plain write over a live session
+    # does reload. Copying from the image keeps one source of truth.
+    mkdir -p "$DST"
+    cp "$SRC" "$DST/favorites"
+    echo "Dock layout applied. Unmatched IDs render as a broken icon rather"
+    echo "than vanishing - verify with:"
+    echo "  cat $DST/favorites"
 
 # Full Bluefin → laptop-os migration. Prompts per phase; yes=1 skips prompts.
 [group('System')]

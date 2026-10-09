@@ -45,6 +45,33 @@ dnf5 install -y @cosmic-desktop
 echo "COSMIC desktop installed"
 echo "::endgroup::"
 
+echo "::group:: Configure dock"
+
+# Dock favorites land after the cosmic RPMs, not in 10-build.sh: cosmic-applets
+# ships its own default schema under /usr/share/cosmic, and a file written
+# before the package installs is at best pointless and at worst a package/file
+# conflict. cosmic-config falls back to this path per key, so it only supplies a
+# value for users who have not pinned apps themselves.
+COSMIC_APP_LIST_DIR=/usr/share/cosmic/com.system76.CosmicAppList/v1
+mkdir -p "$COSMIC_APP_LIST_DIR"
+install -m 0644 /ctx/overrides/cosmic/com.system76.CosmicAppList/v1/favorites \
+    "$COSMIC_APP_LIST_DIR/favorites"
+
+# Same trap as build/30-browsers.sh: an unmatched ID does not vanish from the
+# dock, it renders as a broken placeholder icon. Verify the OS-shipped entries.
+for desktop_id in com.system76.CosmicFiles com.system76.CosmicTerm; do
+    if ! [[ -f /usr/share/applications/"${desktop_id}.desktop" ]]; then
+        echo "WARNING: ${desktop_id}.desktop not found; the dock will show a"
+        echo "broken icon for it. List what is installed:"
+        ls /usr/share/applications/*osmic* 2>/dev/null || true
+        echo "Then update overrides/cosmic/com.system76.CosmicAppList/v1/favorites"
+        echo "and custom/ujust/custom-migrate.just"
+    fi
+done
+
+echo "Dock configured"
+echo "::endgroup::"
+
 echo "::group:: Configure display manager"
 
 # cosmic-greeter.service is enabled by Fedora's 85-display-manager preset, but
