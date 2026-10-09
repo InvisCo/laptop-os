@@ -5,9 +5,8 @@ set -euo pipefail
 
 ###############################################################################
 # Native browsers: Brave Origin (RPM, adblock built in, no rewards/crypto/VPN)
-# and LibreWolf (RPM from the official signed repository, with 1Password
-# native-messaging bridge). Firefox is intentionally NOT shipped;
-# LibreWolf is the primary.
+# and LibreWolf (RPM from the official signed repository). Firefox is
+# intentionally NOT shipped; LibreWolf is the primary.
 ###############################################################################
 
 ### Brave Origin from official repository
@@ -47,15 +46,6 @@ rm -f /etc/yum.repos.d/librewolf.repo
 
 echo "LibreWolf installed successfully"
 
-### 1Password <-> browser native messaging bridges
-# 1Password ships its Firefox-family native messaging manifest into
-# /usr/lib64/mozilla/native-messaging-hosts. LibreWolf only looks in its own
-# directory, so link them per upstream FAQ:
-# https://librewolf.net/docs/faq/#how-do-i-get-native-messaging-to-work
-echo "Wiring 1Password native messaging into LibreWolf..."
-mkdir -p /usr/lib/librewolf
-ln -sfn /usr/lib64/mozilla/native-messaging-hosts /usr/lib/librewolf/native-messaging-hosts
-
 ### Managed policies (password manager offloading)
 echo "Installing browser policies..."
 
@@ -72,17 +62,17 @@ mkdir -p /usr/share/laptop-os/librewolf
 install -m 0644 /ctx/overrides/librewolf/librewolf.overrides.cfg \
     /usr/share/laptop-os/librewolf/librewolf.overrides.cfg
 
-# Verify the .desktop IDs the dock override expects. A renamed .desktop file
-# silently vanishes from favorite-apps, so fail loudly here instead.
-for desktop_id in librewolf.desktop brave-origin.desktop; do
-    if ! ls /usr/share/applications/"${desktop_id}" >/dev/null 2>&1; then
-        echo "WARNING: expected /usr/share/applications/${desktop_id} not found."
+# Verify the .desktop IDs the dock defaults expect. A renamed .desktop file
+# silently vanishes from the dock, so fail loudly here instead.
+for desktop_id in librewolf brave-origin; do
+    if ! ls /usr/share/applications/"${desktop_id}".desktop >/dev/null 2>&1; then
+        echo "WARNING: expected /usr/share/applications/${desktop_id}.desktop not found."
         echo "Installed browser .desktop files:"
         for f in /usr/share/applications/*brave* /usr/share/applications/*librewolf* /usr/share/applications/*wolf*; do
             [[ -e "$f" ]] && basename "$f"
         done
         echo "If the RPM renamed its .desktop file, update"
-        echo "overrides/dconf/zz1-laptop-os.gschema.override and custom/ujust/custom-migrate.just"
+        echo "overrides/cosmic/com.system76.CosmicAppList/v1/favorites"
     fi
 done
 
