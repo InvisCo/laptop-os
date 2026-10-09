@@ -105,3 +105,88 @@ teardown() {
     [ "$(grep -c '^[[:space:]]*cask "[^"]*"' "${brewfile}")" -eq 3 ]
     grep -qF 'tap "ublue-os/tap", trusted: true' "${brewfile}"
 }
+
+@test "install-apps pins both integration groups to a GID >= 1000" {
+    recipe="${BATS_TEST_DIRNAME}/../../custom/ujust/custom-apps.just"
+    run grep -qE 'ensure_group onepassword 1500' "${recipe}"
+    [ "${status}" -eq 0 ]
+    run grep -qE 'ensure_group onepassword-cli 1501' "${recipe}"
+    [ "${status}" -eq 0 ]
+}
+
+@test "ensure_group creates a missing group with the requested gid" {
+    awk '/^[[:space:]]*ensure_group\(\)[[:space:]]*\{/{on=1} on{print} on&&/^[[:space:]]*\}[[:space:]]*$/{exit}' \
+        "${RECIPE}" > "${WORKDIR}/ensure_group.sh"
+    run bash -c '
+        set -euo pipefail
+        source "$1"
+        sudo() { "$@"; }
+        groupadd() { echo "GROUPADD $*"; }
+        groupmod() { echo "GROUPMOD $*"; }
+        getent() { return 2; }
+        ensure_group onepassword-cli 1501' _ "${WORKDIR}/ensure_group.sh"
+    [ "${status}" -eq 0 ]
+    [[ "${output}" == *"GROUPADD -g 1501 onepassword-cli"* ]]
+}
+
+@test "ensure_group fails loudly when the group cannot be moved off a bad gid" {
+    awk '/^[[:space:]]*ensure_group\(\)[[:space:]]*\{/{on=1} on{print} on&&/^[[:space:]]*\}[[:space:]]*$/{exit}' \
+        "${RECIPE}" > "${WORKDIR}/ensure_group.sh"
+    run bash -c '
+        set -euo pipefail
+        source "$1"
+        groupadd() { :; }
+        groupmod() { return 8; }
+        sudo() { return 1; }
+        getent() { echo "onepassword:x:963:"; }
+        ensure_group onepassword 1500' _ "${WORKDIR}/ensure_group.sh"
+    [ "${status}" -ne 0 ]
+    [[ "${output}" == *"FAIL"* ]]
+    [[ "${output}" == *"963"* ]]
+}
+
+@test "install-apps requires the invoking user to be in the integration groups" {
+    recipe="${BATS_TEST_DIRNAME}/../../custom/ujust/custom-apps.just"
+    run grep -qF 'usermod -aG onepassword,onepassword-cli' "${recipe}"
+    [ "${status}" -eq 0 ]
+}
+
+@test "install-apps asserts ptrace_scope because the helper aborts without Yama" {
+    recipe="${BATS_TEST_DIRNAME}/../../custom/ujust/custom-apps.just"
+    run grep -qF 'kernel.yama.ptrace_scope' "${recipe}"
+    [ "${status}" -eq 0 ]
+    build_script="${BATS_TEST_DIRNAME}/../../build/10-build.sh"
+    run grep -qF 'kernel.yama.ptrace_scope = 1' "${build_script}"
+    [ "${status}" -eq 0 ]
+}
+
+@test "the image pins both groups so the RPM cannot allocate a system gid" {
+    build_script="${BATS_TEST_DIRNAME}/../../build/10-build.sh"
+    run grep -qE '^g onepassword 1500' <(sed -n '/1password.conf/,/EOF/p' "${build_script}")
+    [ "${status}" -eq 0 ]
+    run grep -qE '^g onepassword-cli 1501' <(sed -n '/1password.conf/,/EOF/p' "${build_script}")
+    [ "${status}" -eq 0 ]
+}
+
+@test "the bridge execs the helper directly, never through sg" {
+    recipe="${BATS_TEST_DIRNAME}/../../custom/ujust/custom-apps.just"
+    # `sg` makes the helper exec from a shell that already holds the group, so
+    # AT_SECURE stays 0 and the helper aborts ("without libc's security").
+    run grep -c 'flatpak-spawn --host sg ' "${recipe}"
+    [ "${output}" -eq 0 ]
+    # ignore the explanatory comment, which names `sg` to say why it is banned
+    run bash -c 'grep -v "^[[:space:]]*#" "$1" | grep -c "sg onepassword -c"' _ "${recipe}"
+    [ "${output}" -eq 0 ]
+    run grep -qF 'exec flatpak-spawn --host' "${recipe}"
+    [ "${status}" -eq 0 ]
+}
+
+@test "the bridge writes a manifest to every directory Gecko scans" {
+    recipe="${BATS_TEST_DIRNAME}/../../custom/ujust/custom-apps.just"
+    run grep -qF '.mozilla/native-messaging-hosts' "${recipe}"
+    [ "${status}" -eq 0 ]
+    run grep -qF 'config/mozilla/native-messaging-hosts' "${recipe}"
+    [ "${status}" -eq 0 ]
+    run grep -qF 'profiles.ini' "${recipe}"
+    [ "${status}" -eq 0 ]
+}

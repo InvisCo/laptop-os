@@ -31,7 +31,8 @@ Published as `ghcr.io/invisco/laptop-os:{stable,stable-testing,testing}`, keyles
 ### Configuration Changes
 
 - LibreWolf loosened-defaults overrides shipped to `/usr/share/laptop-os/librewolf/librewolf.overrides.cfg`; activate per user with `ujust laptop-os-librewolf-overrides`. Active prefs: DRM (EME), WebGL, search suggestions, Firefox Sync UI. GSB, RFP, canvas prompts intentionally untouched.
-- 1Password native messaging is wired at runtime by `ujust install-apps`: the casks generate manifests in `~/.mozilla/native-messaging-hosts` and `~/.config/BraveSoftware/Brave-Browser/NativeMessagingHosts`, and the recipe mirrors them into `~/.librewolf/native-messaging-hosts` and `~/.config/BraveSoftware/Brave-Origin/NativeMessagingHosts`, plus `brave-origin` and `librewolf` in `/etc/1password/custom_allowed_browsers` (appended only for browsers whose binary exists). Re-run it after `brew upgrade` and after every `bootc switch` (groups and `/etc/1password` live in `/etc`).
+- 1Password browser integration depends on three things that look fine until they are not, all asserted by `ujust install-apps`: the `onepassword` group must have a **GID >= 1000** and must not share one with a dynamic systemd user (the RPM's `groupadd -r` makes a sub-1000 group and collides with `systemd-coredump`/`pipewire`, which `usermod` cannot move); `kernel.yama.ptrace_scope` must be **>= 1** (the helper aborts otherwise); and the calling user must be a **member** of the group, which is fixed at login, so 1Password must be started from a session opened afterwards. The image pins both GIDs in `/usr/lib/sysusers.d/1password.conf` and sets `ptrace_scope=1`, so the package never allocates its own. The helper must be exec'd **directly** — routing it through `sg onepassword -c ...` leaves `AT_SECURE` unset and the helper aborts with "running without libc's security".
+- Brave Origin and LibreWolf (both native RPMs) integrate natively. Flatpak browsers need the bridge: `ujust install-1password-bridge`, which writes an in-sandbox wrapper plus manifests to all three directories Gecko scans, and allowlists `flatpak-session-helper`. `flatpak-session-helper` must be in `/etc/1password/custom_allowed_browsers` (kept in `/etc`, so re-run after every `bootc switch`, like `install-apps`).
 - `ujust install-apps` re-asserts the permissions 1Password authenticates against — `root:onepassword 2755` on `1Password-BrowserSupport`, `root:onepassword-cli 2755` on `op`, `root:root 4755` on `chrome-sandbox`. The cask applies them through `sudo:` postflight steps, and a declined password prompt leaves them user-owned, which the app reports as "invalid group attempted to connect". The recipe repairs and then asserts, so it fails loudly instead of shipping an app that cannot talk to a browser.
 - `libvirtd.socket` + `libvirtd.service` enabled at boot.
 
@@ -48,7 +49,7 @@ _Last updated: 2026-10-06_
 | `overrides/brave/laptop-os.json` | Brave managed policies |
 | `overrides/librewolf/librewolf.overrides.cfg` | LibreWolf loosened prefs (source of truth) |
 | `rpms/` | Vendored Epson drivers + SHA256SUMS |
-| `custom/flatpaks/default.preinstall` | First-boot Flatpaks (12 apps) |
+| `custom/flatpaks/default.preinstall` | First-boot Flatpaks (13 apps, incl. LibreWolf) |
 | `custom/brew/apps.Brewfile` | 1Password app/CLI + Zed as Linux casks |
 | `custom/ujust/custom-apps.just` | `ujust install-apps` + Brewfile shortcuts |
 | `custom/ujust/custom-system.just` | `ujust` recipes incl. overrides activation |
@@ -136,12 +137,16 @@ All previous rpm-ostree layers (1Password, virt stack, cups-pdf, Epson LocalPack
    ujust install-apps
    ```
    It prints `Repairing …` for the setuid/setgid bits the cask's sudo postflight
-   may not have applied, and ends with a `FAIL:` line if they did not land.
+   may not have applied, creates the `onepassword` groups with pinned GIDs, adds
+   your user to them, and ends with a `FAIL:` line if any part did not land.
+   **Log out and back in afterwards** — group membership is fixed at login, so
+   1Password must be started from a session opened after this. For a Flatpak
+   browser also run `ujust install-1password-bridge`.
    Confirm integration from the app log after toggling the browser on:
    ```bash
    grep -iE 'verified successfully|invalid group' ~/.config/1Password/logs/1Password_rCURRENT.log | tail
    ```
-4. Launch LibreWolf: verify bookmarks, logins, extensions, and that the 1Password extension unlocks against the desktop app.
+4. Launch LibreWolf (native RPM): verify bookmarks, logins, extensions, and that the 1Password extension unlocks against the desktop app. Only a Flatpak browser needs `ujust install-1password-bridge`.
 5. Migrate the Zed config from the Flatpak to the cask build, then launch and check settings (the cask `zed` is on `PATH` via Homebrew, config path unchanged):
    ```bash
    cp -a ~/.var/app/dev.zed.Zed/config/zed ~/.config/zed

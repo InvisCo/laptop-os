@@ -91,6 +91,66 @@ Homebrew casks run on Linux. `ublue-os/tap` ships Linux builds
 
 Keep casks out of `default.Brewfile` — that file must stay headless-installable.
 
+### 1Password browser integration: what actually breaks it
+
+Both native browsers (Brave Origin, LibreWolf RPM) and Flatpak browsers can work.
+The integration fails for reasons that have nothing to do with packaging, so
+check these three before touching permissions again:
+
+1. **The integration group needs a GID >= 1000, and no other account may share
+   it.** The RPM's `groupadd -r` makes a *system* group, which lands below
+   `GID_MIN` (963 on a stock image) and collides with the dynamic systemd users
+   `systemd-coredump` and `pipewire` — which `usermod` cannot move, because
+   nss-systemd synthesises them and they have no `/etc/passwd` entry. Symptom:
+   `invalid group attempted to connect` on every attempt while the file contract
+   looks perfect (`root:onepassword 2755`, correct app group). Upstream match:
+   `lizalc/gentoo-lizalc#1`, which reproduces it on any distro with a
+   sub-1000 `onepassword` gid. Pin the GIDs in the image
+   (`/usr/lib/sysusers.d/1password.conf`, written by `build/10-build.sh`) so the
+   package finds them present, and have `install-apps` assert/repair via
+   `ensure_group`. The app also validates the peer's group against **its own**
+   supplementary groups, so the user must be a member — and membership is fixed
+   at login, so 1Password must be started from a session opened after that.
+2. **`kernel.yama.ptrace_scope` must be >= 1.** With 0 the helper logs "Yama is
+   absent or ptrace_scope is set to 0" and aborts before it ever connects.
+   Bluefin ships 0; the image sets 1 in `/usr/lib/sysctl.d/90-1password.conf`.
+3. **Exec the helper directly — never `sg onepassword -c ...`.** `sg` execs the
+   helper from a shell that *already* holds the group, so there is no privilege
+   transition: `AT_SECURE` stays 0 and the helper aborts with "process detected
+   it was running without libc's security". Forcing the gid with `sg` therefore
+   makes things worse, not better. Let the setgid bit do the work.
+
+What is *not* a cause, despite looking like one: Chromium's `NO_NEW_PRIVS`. The
+renderer/gpu children carry `NoNewPrivs: 1`, but the native messaging host is
+spawned with `nnp=0` and Brave Origin connects natively with no bridge at all.
+
+Both browsers are native RPMs and integrate directly; no Flatpak browser is
+preinstalled, and LibreWolf deliberately is not (it would duplicate the RPM).
+For a Flatpak browser add the bridge (`ujust install-1password-bridge [HELPER]
+[FLATPAK_ID]` in `custom/ujust/custom-apps.just`, defaulting to
+`io.gitlab.librewolf-community`): the app stays native, and an
+in-sandbox wrapper calls `flatpak-spawn --host <helper>`. Two gotchas: Gecko
+reads manifests from three places (user-level dir, XDG config dir, **and** the
+profile dir) — writing one produces a browser that silently never spawns the
+host; and `flatpak-session-helper` must be in
+`/etc/1password/custom_allowed_browsers`.
+
+Three justfile constraints, all learned the hard way:
+
+1. **No heredocs.** just cannot parse `<<EOF` blocks. Assemble generated files
+   with `printf '%s\n'` lines.
+2. **Backslash-escape literal dollars.** `$$` passes through to the shell
+   untouched (bash then eats it as PID). Write `\$@` in single quotes and
+   `\"…\${…}…\"` in double quotes — see the wrapper writer.
+3. **Keep recipe functions awk-extractable.** `tests/template/bridge_test.bats`
+   and `tests/template/install-apps_test.bats` extract `bridge_helper`,
+   `bridge_manifest_dirs`, `bridge_write` and `ensure_group` verbatim and drive
+   them with shims; the extractor stops at the 4-space-indented `}`, so no other
+   column-4 lone brace may appear inside those functions.
+
+Note `getent` exits non-zero for a missing group: under `set -e -o pipefail` an
+unguarded `have="$(getent ...)"` aborts the recipe before it can create it.
+
 ### How Users Invoke Them
 
 Users install via `ujust` commands (shortcuts defined in `custom/ujust/*.just`):

@@ -64,6 +64,35 @@ echo "::endgroup::"
 
 echo "::group:: System Configuration"
 
+# 1Password integration groups, with fixed GIDs chosen by us.
+#
+# 1Password authenticates the browser through the connecting process's effective
+# group, and 1Password-BrowserSupport must be root:<onepassword> setgid. If the
+# group does not exist, the RPM's `groupadd -r` creates it as a *system* group,
+# which lands below GID_MIN (963 on a stock image). A sub-1000 GID is rejected
+# with "invalid group attempted to connect", and on this image it additionally
+# collides with the dynamic systemd users systemd-coredump (963) and pipewire
+# (965) - users that `usermod` cannot move because nss-systemd synthesises them.
+#
+# Declaring the groups here, before any 1Password package is installed, means
+# the package finds them already present and never allocates its own.
+mkdir -p /usr/lib/sysusers.d
+cat >/usr/lib/sysusers.d/1password.conf <<'EOF'
+# 1Password browser integration. GIDs are pinned: see build/10-build.sh.
+g onepassword 1500 -
+g onepassword-cli 1501 -
+EOF
+
+# 1Password-BrowserSupport refuses to start when ptrace_scope is 0: it logs
+# "Yama is absent or ptrace_scope is set to 0" and aborts, because its own
+# anti-tampering checks depend on Yama restricting who may inspect it. Bluefin
+# ships 0. This is also the safer default, so set it in the image rather than
+# at runtime.
+cat >/usr/lib/sysctl.d/90-1password.conf <<'EOF'
+# Required by 1Password-BrowserSupport (op-startup/src/linux.rs).
+kernel.yama.ptrace_scope = 1
+EOF
+
 # Enable/disable systemd services
 systemctl enable podman.socket
 systemctl enable brew-setup.service
