@@ -36,7 +36,7 @@
 
 # Base Image - Bluefin stable (F44, GNOME, kernel/akmods/udev/ujust/uupd baked in)
 # Renovate will keep the digest pin up to date.
-ARG BASE_IMAGE="ghcr.io/ublue-os/bluefin:stable@sha256:71a328c539a63bd8ff3aab0c5dcb047d094d8cade6c7bb3473200053edc265de"
+ARG BASE_IMAGE="ghcr.io/ublue-os/bluefin:stable@sha256:23b7bf54349f1a93c2fea4168c7725a632641ee67ae29b0951ef1976c1ba2bc9"
 ARG ESCPR_CFLAGS="-Wno-error=implicit-function-declaration -Wno-error=implicit-int -Wno-implicit-function-declaration"
 
 # OCI context images - imported below and pinned directly in their FROM lines.
