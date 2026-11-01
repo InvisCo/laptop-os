@@ -36,12 +36,12 @@
 
 # Base Image - Bluefin stable (F44, GNOME, kernel/akmods/udev/ujust/uupd baked in)
 # Renovate will keep the digest pin up to date.
-ARG BASE_IMAGE="ghcr.io/ublue-os/bluefin:stable@sha256:71a328c539a63bd8ff3aab0c5dcb047d094d8cade6c7bb3473200053edc265de"
+ARG BASE_IMAGE="ghcr.io/ublue-os/bluefin:stable@sha256:afe335088014cf0c20257c64d81a474ff683c9e6796a633ea8ebadee428d26e9"
 ARG ESCPR_CFLAGS="-Wno-error=implicit-function-declaration -Wno-error=implicit-int -Wno-implicit-function-declaration"
 
 # OCI context images - imported below and pinned directly in their FROM lines.
 # The base image is pinned in the FROM line below and updated by Renovate.
-FROM ghcr.io/ublue-os/brew:latest@sha256:60ada2d65891d8797beef49d8b43f2108519cbbaf04c9c7363e1a008677fcd35 AS brew
+FROM ghcr.io/ublue-os/brew:latest@sha256:974ce5e4d6d5fceb6151910957515a42c0eefced4ea386fdfadb0fbad84499a5 AS brew
 
 # Context stage - combine local and imported OCI container resources
 FROM scratch AS ctx
