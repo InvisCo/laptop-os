@@ -20,7 +20,7 @@ on:
   # goes stale. The cron is the only thing that recovers from that. Dispatch it
   # to force a sync after repairing the branch model by hand.
   schedule:
-    - cron: "5 */6 * * *"
+    - cron: "10 0 * * 2,5"
   workflow_dispatch:
 
 permissions:

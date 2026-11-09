@@ -125,7 +125,7 @@ description: >-
 | Rationalization                                                   | Reality                                                                                                                                              |
 | ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
 | "The build failed in CI but works locally — it must be a CI bug." | CI is the source of truth. Local environments often have cached layers or different podman versions. Start with `just build` on a clean environment. |
-| "Renovate is broken — it hasn't made a PR in days."               | Renovate runs on a schedule (default 6h). Check the workflow run logs before assuming failure.                                                       |
+| "Renovate is broken — it hasn't made a PR in days."               | Renovate runs Tuesday and Friday at 00:00 UTC. Check the workflow run logs before assuming failure.                                                   |
 | "I don't need to run shellcheck locally — CI will catch it."      | Running `shellcheck` locally is faster and keeps CI queues free. It's a 5-second check.                                                              |
 | "The COPR was disabled, so it can't be the problem."              | Repo files can persist in `/etc/yum.repos.d/` even if `copr` metadata is gone. Check the directory directly.                                         |
 

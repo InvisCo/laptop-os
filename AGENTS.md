@@ -21,7 +21,7 @@ links lives in `.agents/skills/README.md`.
   `main`.
 - Promotion is `main` → `stable` via the PR opened by
   `.github/workflows/promote-main-to-stable.yml`, a thin caller for the factory
-  `projectbluefin/actions` `reusable-promote-squash.yml`. It runs daily on a
+  `projectbluefin/actions` `reusable-promote-squash.yml`. It runs weekly on a
   cron and on manual dispatch.
 - Promotions merge via **squash** — `stable` gains one
   `chore: promote main to stable` commit per promotion. The trees stay
@@ -32,7 +32,7 @@ links lives in `.agents/skills/README.md`.
   non-promotion push.
 - The promotion branch is `auto/promote-main-to-stable`, and
   `pr-validation.yml` fails the PR if its tree does not match `main`'s.
-- `sync-stable-to-main.yml` also runs on a 6-hour cron. That cron is a real
+- `sync-stable-to-main.yml` also runs on a Tuesday/Friday cron. That cron is a real
   safety net, not vestigial: GitHub push events on `stable` blacked out
   entirely here for two weeks (Aug 30 – Sep 14 2026), and under digest
   promotion a dropped push means `:stable` silently goes stale. Recover with
