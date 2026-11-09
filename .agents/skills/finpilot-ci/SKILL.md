@@ -35,11 +35,11 @@ description: >-
 | ----------------------------- | --------------------------------- | ------------------------------------------------------------- |
 | `build-image.yml`             | push main, manual                 | Build the candidate and publish `:stable-testing` + `:testing`; skips pushes whose diff only touches `paths-ignore` files. `stable` never builds |
 | `execute-release.yml`         | push stable, manual               | Release gate + digest promotion: copy the signed `:testing` candidate digest to `:stable`. Refuses a push to `stable` that is not a promotion |
-| `promote-main-to-stable.yml`  | schedule 04:00, manual            | Thin caller for `reusable-promote-squash.yml`: open/refresh the squash promotion PR `main` → `stable` from `auto/promote-main-to-stable`, repair a branch whose tree drifted, unblock the bot's held checks, run the release gate |
-| `sync-stable-to-main.yml`     | push stable + 6h cron + manual    | Merge direct `stable` hotfixes back to `main` (usually no-op). The cron is the recovery path for a `stable` push blackout |
+| `promote-main-to-stable.yml`  | Saturday 00:00 UTC, manual        | Thin caller for `reusable-promote-squash.yml`: open/refresh the squash promotion PR `main` → `stable` from `auto/promote-main-to-stable`, repair a branch whose tree drifted, unblock the bot's held checks, run the release gate |
+| `sync-stable-to-main.yml`     | push stable, Tuesday/Friday 00:10 UTC, manual | Merge direct `stable` hotfixes back to `main` (usually no-op). The cron is the recovery path for a `stable` push blackout |
 | `pr-validation.yml`           | PR → main, stable; merge_group    | shellcheck (scope = `git ls-files '*.sh'`) + hadolint + pre-commit via `validate-pr`; fails a promotion PR whose tree does not match `main` |
 | `unit-tests.yml`              | PR + push main/stable, merge_group | `just test-unit` — BATS contract + template suites |
-| `renovate.yml`                | schedule 6h, push renovate config | Self-hosted Renovate runner                                   |
+| `renovate.yml`                | Tuesday/Friday 00:00 UTC, push renovate config, manual | Self-hosted Renovate runner |
 | `clean.yml`                   | schedule weekly                   | Delete GHCR images older than 90 days                         |
 | `validate-brewfiles.yml`      | PR paths: `custom/brew/**`        | `just validate-brewfiles` — greps Brewfiles, resolves names via `brew info` as data |
 | `validate-flatpaks.yml`       | PR paths: `custom/flatpaks/**`    | `build/validate-flatpaks.sh` — Branch= key + Flathub app existence |
@@ -75,7 +75,7 @@ description: >-
 - GitHub push events on `stable` blacked out entirely here for two weeks
   (Aug 30 - Sep 14 2026). Under digest promotion a dropped push means `:stable`
   silently goes stale. Recover with `gh workflow run execute-release.yml`;
-  the 6-hour cron on `sync-stable-to-main.yml` is the standing net.
+  the Tuesday/Friday cron on `sync-stable-to-main.yml` is the standing net.
 - `build-image.yml` only runs on `main`, so `Determine image tag` always takes
   the testing branch and `TAG_STREAM=testing` is a constant in practice;
   `Finalize branch tags` renames `testing*` to `stable-testing-*` and keeps the

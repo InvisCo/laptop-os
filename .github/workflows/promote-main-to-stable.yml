@@ -3,7 +3,7 @@ name: Promote main to stable
 
 # Two-branch model: `main` is the testing branch (publishes :stable-testing and
 # :testing); `stable` is the production branch. The shared factory workflow
-# opens (or refreshes) a squash promotion PR from `main` to `stable` daily, or
+# opens (or refreshes) a squash promotion PR from `main` to `stable` weekly, or
 # when a maintainer dispatches it. Merging that PR triggers digest promotion in
 # execute-release.yml; it does not rebuild `:stable`.
 #
@@ -27,8 +27,8 @@ name: Promote main to stable
 
 on:
   schedule:
-    # Default daily promotion window. Fork owners may change this cadence.
-    - cron: "0 4 * * *"
+    # Saturday at 00:00 UTC.
+    - cron: "0 0 * * 6"
   workflow_dispatch:
 
 permissions:
