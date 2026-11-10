@@ -1,0 +1,27 @@
+// laptop-os dock favorites (COSMIC panel dock).
+//
+// cosmic-config stores one RON value per file; the dock's pinned apps live in
+// the com.system76.CosmicAppList component, key `favorites`, version 1. Installed
+// to /usr/share/cosmic/com.system76.CosmicAppList/v1/favorites by
+// build/50-cosmic-desktop.sh, after the cosmic RPMs land, so the image default
+// is not clobbered by a package-shipped schema file.
+//
+// This path is the system default: cosmic-config falls back to it
+// (XDG_DATA_DIRS, prefix `cosmic`) on a per-key basis, so it applies to any user
+// who has not pinned apps themselves. Existing users keep their own file at
+// ~/.config/cosmic/com.system76.CosmicAppList/v1/favorites; `ujust
+// set-dock-layout` overwrites that.
+//
+// IDs are stored WITHOUT the .desktop suffix (cosmic's get_app_id strips it),
+// and resolution is fuzzy: StartupWMClass, file stem, Name, Exec. An ID that
+// matches nothing is NOT dropped - it renders as a broken placeholder icon, so
+// a typo is visible rather than silent. build/50-cosmic-desktop.sh verifies
+// the OS-shipped IDs and build/30-browsers.sh verifies the browsers.
+[
+    "librewolf",
+    "brave-origin",
+    "com.system76.CosmicFiles",
+    "eu.betterbird.Betterbird",
+    "com.system76.CosmicTerm",
+    "org.gnome.gitlab.cheywood.Buffer",
+]

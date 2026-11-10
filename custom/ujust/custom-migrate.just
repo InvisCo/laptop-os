@@ -7,15 +7,27 @@
 ## every phase idempotent). User-level tools only by rule — brew/flatpak/gsettings.
 
 # Apply the laptop-os dock layout to the live user DB.
-# Image gschema defaults only reach new users; migrated users need this.
+# Image defaults only reach users who have never pinned an app themselves;
+# cosmic-config resolves `favorites` per key from the local file first, so
+# anyone with an existing ~/.config/cosmic/... needs this.
 [group('System')]
 set-dock-layout:
     #!/usr/bin/env bash
     set -euo pipefail
-    FAVORITES="['app.zen_browser.zen.desktop', 'librewolf.desktop', 'brave-origin.desktop', 'org.gnome.Nautilus.desktop', 'eu.betterbird.Betterbird.desktop', 'org.gnome.Ptyxis.desktop', 'org.gnome.gitlab.cheywood.Buffer.desktop']"
-    gsettings set org.gnome.shell favorite-apps "$FAVORITES"
-    echo "Dock layout applied. Missing IDs vanish silently — verify with:"
-    echo "  gsettings get org.gnome.shell favorite-apps"
+    SRC="/usr/share/cosmic/com.system76.CosmicAppList/v1/favorites"
+    DST="$HOME/.config/cosmic/com.system76.CosmicAppList/v1"
+    if [[ ! -f "$SRC" ]]; then
+        echo "Image dock defaults missing at $SRC - is this laptop-os?" >&2
+        exit 1
+    fi
+    # Seed first, then copy: cosmic-config watches the user directory and
+    # ignores .atomicwrite* temp files, so a plain write over a live session
+    # does reload. Copying from the image keeps one source of truth.
+    mkdir -p "$DST"
+    cp "$SRC" "$DST/favorites"
+    echo "Dock layout applied. Unmatched IDs render as a broken icon rather"
+    echo "than vanishing - verify with:"
+    echo "  cat $DST/favorites"
 
 # Full Bluefin → laptop-os migration. Prompts per phase; yes=1 skips prompts.
 [group('System')]
@@ -45,7 +57,7 @@ migrate-from-bluefin yes="0":
     echo "::endgroup::"
 
     echo "::group:: Brew bundles"
-    if confirm "Install Brew bundles (default + dev + fonts)?"; then
+    if confirm "Install Brew bundles incl. 1Password + Zed casks (needs sudo)?"; then
         just --justfile "{{ justfile() }}" install-all-brew
     fi
     echo "::endgroup::"
@@ -53,7 +65,7 @@ migrate-from-bluefin yes="0":
     echo "::group:: Flatpaks"
     if confirm "Top up Flatpaks from preinstall list?"; then
         flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
-        for app in app.zen_browser.zen eu.betterbird.Betterbird org.gimp.GIMP org.inkscape.Inkscape org.libreoffice.LibreOffice org.kde.okular org.onlyoffice.desktopeditors com.protonvpn.www org.rncbc.qpwgraph com.rawtherapee.RawTherapee org.remmina.Remmina com.rustdesk.RustDesk; do
+        for app in eu.betterbird.Betterbird org.gimp.GIMP org.inkscape.Inkscape org.libreoffice.LibreOffice org.kde.okular org.onlyoffice.desktopeditors com.protonvpn.www org.rncbc.qpwgraph com.rawtherapee.RawTherapee org.remmina.Remmina com.rustdesk.RustDesk; do
             if flatpak list --app --columns=application 2>/dev/null | grep -qx "$app"; then
                 echo "  $app already installed, skipping."
             else
@@ -105,10 +117,10 @@ migrate-from-bluefin yes="0":
     echo "::endgroup::"
 
     echo "::group:: 1Password checklist (manual)"
-    echo "  1. Sign in to 1Password (app + browser extension pre-wired)."
-    echo "  2. Enable Settings → Browser → 'Integrate with 1Password in your browser' (LibreWolf trust is baked in)."
+    echo "  1. Sign in to 1Password (app + browser extension wired by the casks + install-apps)."
+    echo "  2. Enable Settings → Browser → 'Integrate with 1Password in your browser' (LibreWolf needs the allowlist entry added above)."
     echo "  3. op signin, enable SSH agent if used."
-    echo "  4. virsh list --all (virt check); flatpak list | grep -i zen (Zen check)."
+    echo "  4. virsh list --all (virt check)."
     echo "::endgroup::"
 
     mkdir -p "$(dirname "$MARKER")"

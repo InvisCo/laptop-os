@@ -6,41 +6,45 @@ on:
   pull_request:
     paths:
       - "custom/flatpaks/**"
+      - "build/validate-flatpaks.sh"
+      - ".github/workflows/validate-flatpaks.yml"
 jobs:
   validate:
-    runs-on: ubuntu-latest
+    # Pinned to 24.04: on ubuntu-latest (26.04) the baked apt lists name
+    # freshly-rotated package versions that the mirror has already dropped, so
+    # the flatpak install 404s. Renovate holds the major below in renovate.json.
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      - name: Set up Flathub
+      # The script adds the Flathub remote itself (--user, --if-not-exists), so
+      # only the binary is needed here. Refresh the apt lists first: the runner
+      # image bakes them at image build time, so once a package rotates off the
+      # mirror they name a version that is gone and the install 404s.
+      #
+      # GitHub's apt mirror also intermittently 404s freshly-published debs
+      # (e.g. xdg-desktop-portal); it self-heals within minutes, so retry the
+      # install rather than touching sources (mirror+file: URIs need
+      # /etc/apt/apt-mirrors.txt).
+      - name: Install flatpak
         shell: bash
         run: |
-          sudo apt install -y flatpak
-          flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+          sudo apt-get update
+          installed=0
+          for attempt in 1 2 3 4 5; do
+            if sudo apt-get install -y flatpak; then
+              installed=1
+              break
+            fi
+            echo "apt install attempt $attempt failed; mirror may be mid-sync, retrying in 15s"
+            sleep 15
+          done
+          [ "$installed" -eq 1 ] || { echo "flatpak install kept failing after 5 attempts"; exit 1; }
 
+      # Single implementation of the validation contract, shared with
+      # `just validate-flatpaks`. The paths above include the script so a
+      # change to the contract runs the check that enforces it.
       - name: Validate Flatpaks
         shell: bash
-        run: |
-          echo "Validating flatpak preinstall files in custom/flatpaks/ directory..."
-
-          set -xeuo pipefail
-
-          find "custom/flatpaks" -iname '*\.preinstall' -print0 | \
-            while IFS= read -r -d '' flatpaks_file ; do
-              echo "::group:: ===$(basename "$flatpaks_file")==="
-              while IFS= read -r app_id; do
-                branch=$(awk -v app="$app_id" '
-                  $0 == "[Flatpak Preinstall " app "]" {found=1; next}
-                  found && /^Branch=/ {print; valid=1; exit}
-                  found && /^\[/ {exit}
-                  END {if (!valid) print "MISSING"}
-                ' "$flatpaks_file")
-                if [ "$branch" = "MISSING" ]; then
-                  echo "✗ $app_id: missing Branch= key"
-                  exit 1
-                fi
-                flatpak remote-info --user flathub "${app_id}"
-              done < <(sed -n 's/^\[Flatpak Preinstall \(.*\)\]$/\1/p' "$flatpaks_file")
-              echo "::endgroup::"
-            done
+        run: build/validate-flatpaks.sh

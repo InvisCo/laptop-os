@@ -43,6 +43,12 @@
       "automergeStrategy": "squash"
     },
     {
+      "description": "Third-party GitHub Actions execute in workflows holding packages:write and the cosign OIDC signing identity (build-image.yml), so their bumps always wait for a human — an automerged compromised release would run there unreviewed. First-party projectbluefin/** actions stay automerged.",
+      "matchManagers": ["github-actions"],
+      "matchPackageNames": ["!projectbluefin/**"],
+      "automerge": false
+    },
+    {
       "description": "Keep first-party OCI context images fresh immediately",
       "matchDepNames": ["ghcr.io/projectbluefin/common", "ghcr.io/ublue-os/brew"],
       "matchUpdateTypes": ["digest", "pinDigest", "pin"],
@@ -50,10 +56,21 @@
       "schedule": ["at any time"]
     },
     {
-      "description": "Do not automatically cross Fedora major releases",
-      "matchDepNames": ["quay.io/fedora-ostree-desktops/silverblue"],
+      "description": "Do not automatically cross a Fedora major release in the base image",
+      "matchDepNames": ["ghcr.io/ublue-os/bluefin"],
       "matchUpdateTypes": ["major"],
       "enabled": false
+    },
+    {
+      "description": "Hold the flatpak validation runner at Ubuntu 24.04: the baked apt lists on a 26.04 runner name dropped package versions. build-image.yml and validate-renovate.yml have moved to 26.04 because projectbluefin/actions' setup-runner now supports it, so this rule only guards validate-flatpaks.yml and any future major. Disable the major outright rather than filtering it with allowedVersions, whose range does not parse under the docker versioning a github-runner dep uses. This rule does not block a hand-applied 26.04 bump to the two build workflows — remove it once validate-flatpaks.yml also moves.",
+      "matchDepNames": ["ubuntu"],
+      "matchUpdateTypes": ["major"],
+      "enabled": false
+    },
+    {
+      "description": "A major crossing always waits for a human — never automerge one. Last matching rule wins, so keep this rule last.",
+      "matchUpdateTypes": ["major"],
+      "automerge": false
     }
   ]
 }

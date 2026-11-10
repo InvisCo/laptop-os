@@ -55,9 +55,12 @@ release, update both the `FEDORA_MAJOR_VERSION` ARG and the base image tag.
 | ------------------ | ------------------------------------------------------------------------------------- |
 | `00-image-info.sh` | Metadata only: writes `image-info.json`, customises `os-release`                      |
 | `10-build.sh`      | Main script: copies custom files, `dnf5 install`                                      |
-| `20-*.sh`          | Optional extras: third-party repos, COPR packages                                     |
-| `30-*.sh`          | Optional desktop swaps                                                                |
+| `20-*.sh` / `30-*.sh` | Extra build phases: third-party repos, COPR packages, browsers (`30-browsers.sh`) |
+| `40-*.sh` / `50-*.sh` | Hardware and desktop phases: printers (`40-epson-printers.sh`), desktop swap (`50-cosmic-desktop.sh`) |
 | `clean-stage.sh`   | Always runs last: reverts `keepcache`, disables fedora flatpak repo, clears artefacts |
+
+Numbers communicate intent and the Containerfile decides order — there is no
+prefix auto-discovery. Vacating a number is fine; gaps are normal.
 
 ### Template build script rules
 
@@ -66,21 +69,6 @@ release, update both the `FEDORA_MAJOR_VERSION` ARG and the base image tag.
 - Always use `dnf5` — never `dnf`, `yum`, or `rpm-ostree`
 - Always use `dnf5 install -y` (non-interactive)
 - COPR: enable → install → `copr_install_isolated` (auto-disables); never leave a repo enabled
-
-### NVIDIA GPU support
-
-NVIDIA support is a build-time option activated by renaming the example script and adding its explicit Containerfile `RUN` block:
-
-```bash
-mv build/40-nvidia.sh.example build/40-nvidia.sh
-# Add the standard RUN block for /ctx/build/40-nvidia.sh after 10-build.sh.
-# See build/README.md.
-just build
-```
-
-All NVIDIA logic is self-contained in `40-nvidia.sh`. When both the script and its explicit Containerfile `RUN` block are activated, it provisions the NVIDIA driver, CDI container toolkit, Mutter kms-modifiers, and bootc kernel args directly into the base image — no separate image variant, no `IMAGE_NAME` gating.
-
-Deactivate by removing its Containerfile `RUN` block and renaming the script back to `.example`. See `build/40-nvidia.sh.example` for the full implementation.
 
 ### 00-image-info.sh branding
 

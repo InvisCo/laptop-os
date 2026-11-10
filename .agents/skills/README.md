@@ -21,7 +21,6 @@ file whose frontmatter tells compatible agents when to load it.
 | [`finpilot-maintain`](finpilot-maintain/SKILL.md) | Ongoing work: Renovate PRs, README raptor updates, local test loops. |
 | [`finpilot-troubleshooting`](finpilot-troubleshooting/SKILL.md) | Symptom → cause → fix tables for build, CI, and runtime issues. |
 | [`finpilot-pr-checklist`](finpilot-pr-checklist/SKILL.md) | Pre-commit and per-change-type validation checklists. |
-| [`finpilot-examples`](finpilot-examples/SKILL.md) | Runnable example scripts and the `.example` → `.sh` activation pattern. |
 | [`skill-improvement`](skill-improvement/SKILL.md) | Capture durable, finpilot-specific operational learning. |
 
 Looking for "I need to… → which skill?" — that table lives in
