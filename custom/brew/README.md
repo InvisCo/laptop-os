@@ -24,18 +24,19 @@ Brewfiles are Homebrew's way of declaring packages in a declarative format. They
 - [`default.Brewfile`](default.Brewfile) - Essential command-line tools
 - [`development.Brewfile`](development.Brewfile) - Development tools and languages
 - [`fonts.Brewfile`](fonts.Brewfile) - Programming fonts
-- [`apps.Brewfile`](apps.Brewfile) - GUI casks from `ublue-os/tap` (1Password app/CLI, Zed)
+- [`apps.Brewfile`](apps.Brewfile) - GUI casks: 1Password app/CLI from `ublue-os/tap`, Zed from `homebrew/cask`
 
 ### Linux casks
 
 Homebrew casks work on Linux, and [ublue-os/tap](https://github.com/ublue-os/homebrew-tap)
 ships Linux builds of GUI apps (`1password-gui-linux`, `1password-cli-linux`,
-`zed-linux`, `visual-studio-code-linux`, ...). Four constraints:
+`visual-studio-code-linux`, ...). Some apps (`zed`, `antigravity-cli`) are now
+in `homebrew/cask` core — use their bare names. Four constraints:
 
 1. Third-party taps must be trusted before Homebrew will run their code. Declare
    it as `tap "ublue-os/tap", trusted: true` — `brew bundle` trusts it, and
    `build/validate-brewfiles.sh` accepts that literal form.
-2. Qualify every cask token with its tap: `cask "ublue-os/tap/zed-linux"`.
+2. Qualify third-party tap tokens: `cask "ublue-os/tap/1password-gui-linux"`.
    `brew bundle` resolves tokens while it loads the file, before its own tap
    lines run, so a bare name resolves against `homebrew/cask`, is skipped with
    "Skipping cask … (requires macOS)", and the first run installs nothing.

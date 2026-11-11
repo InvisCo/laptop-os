@@ -19,7 +19,7 @@ Published as `ghcr.io/invisco/laptop-os:{stable,stable-testing,testing}`, keyles
 
 ### Added Applications (Runtime)
 
-- **GUI Apps (Homebrew casks, `ujust install-apps`)**: 1Password desktop app, 1Password CLI, Zed — from `ublue-os/tap`. Requires a terminal (cask postflight uses sudo).
+- **GUI Apps (Homebrew casks, `ujust install-apps`)**: 1Password desktop app and CLI from `ublue-os/tap`, Zed from `homebrew/cask`. Requires a terminal (cask postflight uses sudo).
 - **GUI Apps (Flatpak, first boot)**: 12 apps — Betterbird, Apostrophe, GIMP, Inkscape, LibreOffice, Okular, OnlyOffice, ProtonVPN, QPWGraph, RawTherapee, Remmina, RustDesk.
 
 ### Removed/Disabled

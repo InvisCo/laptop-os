@@ -112,7 +112,7 @@ after first boot. File locations, syntax, and validation:
 `finpilot-custom`.
 
 GUI apps can also ship as **Linux casks** from `ublue-os/tap`
-(`1password-gui-linux`, `1password-cli-linux`, `zed-linux`). Prefer a cask over
+(`1password-gui-linux`, `1password-cli-linux`; `zed` and `antigravity-cli` moved to `homebrew/cask` core). Prefer a cask over
 a build-time RPM when upstream has no Fedora repo, the app floats faster than
 image releases, or its `/etc` artifacts should stay out of the image. Casks
 need `trusted: true` on the tap line and interactive sudo — see

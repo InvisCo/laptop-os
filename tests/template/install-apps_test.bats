@@ -99,10 +99,11 @@ teardown() {
     [ "${trust_line}" -lt "${bundle_line}" ]
 }
 
-@test "apps.Brewfile qualifies every cask token with its tap" {
+@test "apps.Brewfile pins the intended cask names" {
     brewfile="${BATS_TEST_DIRNAME}/../../custom/brew/apps.Brewfile"
-    [ "$(grep -c '^[[:space:]]*cask "ublue-os/tap/' "${brewfile}")" -eq 3 ]
+    [ "$(grep -c '^[[:space:]]*cask "ublue-os/tap/' "${brewfile}")" -eq 2 ]
     [ "$(grep -c '^[[:space:]]*cask "[^"]*"' "${brewfile}")" -eq 3 ]
+    grep -qFx 'cask "zed"' "${brewfile}"
     grep -qF 'tap "ublue-os/tap", trusted: true' "${brewfile}"
 }
 

@@ -55,24 +55,27 @@ brew "fd"         # Simple alternative to find
 # Taps (repositories)
 tap "homebrew/cask"
 
-# Casks (work on Linux; GUI apps from ublue-os/tap, tokens fully qualified)
+# Casks (work on Linux; ublue-os/tap tokens fully qualified, core casks bare)
 tap "ublue-os/tap", trusted: true
 cask "ublue-os/tap/1password-gui-linux"
-cask "ublue-os/tap/zed-linux"
+cask "zed"
 ```
 
 ### Linux Casks
 
 Homebrew casks run on Linux. `ublue-os/tap` ships Linux builds
-(`1password-gui-linux`, `1password-cli-linux`, `zed-linux`,
-`visual-studio-code-linux`, ...). Four constraints:
+(`1password-gui-linux`, `1password-cli-linux`,
+`visual-studio-code-linux`, ...). Apps upstreamed to `homebrew/cask` core
+(`zed`, `antigravity-cli`) were removed from the tap (ublue-os/homebrew-tap#773,
+#774) — use their bare core names. Four constraints:
 
 1. **Trust the tap.** Third-party taps are untrusted by default. Declare
    `tap "ublue-os/tap", trusted: true` — `brew bundle` trusts it, and
    `build/validate-brewfiles.sh` accepts that literal form (it rejects computed
    tap lines, which is the point).
-2. **Qualify the tokens.** Write `cask "ublue-os/tap/zed-linux"`, never
-   `cask "zed-linux"`. `brew bundle` resolves tokens while loading the file,
+2. **Qualify the tap tokens.** Write `cask "ublue-os/tap/1password-gui-linux"`,
+   never bare `cask "1password-gui-linux"`. Core casks stay bare.
+   `brew bundle` resolves tokens while loading the file,
    before its own tap lines run, so a bare name resolves against
    `homebrew/cask`, gets skipped as "requires macOS", and the first run installs
    nothing. Running `brew trust ublue-os/tap` + `brew tap ublue-os/tap` before
