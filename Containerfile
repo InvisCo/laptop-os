@@ -41,7 +41,7 @@ ARG ESCPR_CFLAGS="-Wno-error=implicit-function-declaration -Wno-error=implicit-i
 
 # OCI context images - imported below and pinned directly in their FROM lines.
 # The base image is pinned in the FROM line below and updated by Renovate.
-FROM ghcr.io/ublue-os/brew:latest@sha256:60ada2d65891d8797beef49d8b43f2108519cbbaf04c9c7363e1a008677fcd35 AS brew
+FROM ghcr.io/ublue-os/brew:latest@sha256:9e0492dbc471258657564c94dae18b58dd96ddb998a06f2b15e8209efb48042b AS brew
 
 # Context stage - combine local and imported OCI container resources
 FROM scratch AS ctx
